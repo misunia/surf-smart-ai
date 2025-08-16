@@ -25,13 +25,13 @@ const HeroSection = () => {
             <h1 className="text-5xl lg:text-6xl font-bold mb-6 leading-tight text-primary-foreground">
               Perfect Your{" "}
               <span className="bg-gradient-sunset bg-clip-text text-transparent">
-                Bottom Turn
+                Surf Technique
               </span>
             </h1>
             
             <p className="text-xl text-primary-foreground/90 mb-8 leading-relaxed">
-              Upload your surf videos and get instant AI feedback on your bottom turn technique. 
-              Improve faster with visual pose analysis and personalized coaching tips.
+              Upload your surf videos and get instant AI feedback on all your techniques. 
+              Master takeoffs, turns, cutbacks and more with visual pose analysis and personalized coaching.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -67,7 +67,7 @@ const HeroSection = () => {
             <div className="relative overflow-hidden rounded-2xl shadow-depth">
               <img 
                 src={heroImage} 
-                alt="AI Surf Coach analyzing bottom turn technique"
+                alt="SurfPilot AI analyzing surf technique with pose detection"
                 className="w-full h-auto transform hover:scale-105 transition-transform duration-700"
               />
               {/* Overlay UI Elements */}
@@ -80,7 +80,7 @@ const HeroSection = () => {
               
               <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur-sm rounded-lg p-3 shadow-wave">
                 <div className="text-sm">
-                  <div className="font-medium text-accent">Bottom Turn Score</div>
+                  <div className="font-medium text-accent">Technique Score</div>
                   <div className="text-2xl font-bold text-primary">87%</div>
                 </div>
               </div>

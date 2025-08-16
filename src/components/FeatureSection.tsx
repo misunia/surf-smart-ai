@@ -7,13 +7,13 @@ const FeatureSection = () => {
     {
       icon: Upload,
       title: "Easy Video Upload",
-      description: "Drag & drop MP4 videos or record directly. Automatically trim to focus on your bottom turn moments.",
+      description: "Drag & drop MP4 videos or record directly. Automatically trim to focus on key technique moments.",
       color: "text-primary"
     },
     {
       icon: Eye,
       title: "AI Pose Analysis",
-      description: "Advanced computer vision detects your body position and movement patterns during the critical turn phases.",
+      description: "Advanced computer vision detects your body position and movement patterns across all surf techniques.",
       color: "text-accent"
     },
     {
@@ -39,7 +39,7 @@ const FeatureSection = () => {
             How It Works
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Upload your surf video and let our AI coach analyze your bottom turn technique in seconds
+            Upload your surf video and let our AI coach analyze your technique across all aspects of surfing
           </p>
         </div>
 

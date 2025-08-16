@@ -61,7 +61,7 @@ const VideoUpload = () => {
       setIsAnalyzing(false);
       toast({
         title: "Analysis complete!",
-        description: "Check your bottom turn feedback below",
+        description: "Check your technique feedback below",
       });
     }, 3000);
   };
@@ -72,7 +72,7 @@ const VideoUpload = () => {
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold mb-4">Upload Your Surf Video</h2>
           <p className="text-xl text-muted-foreground">
-            Get instant AI feedback on your bottom turn technique
+            Get instant AI feedback on all your surf techniques
           </p>
         </div>
 

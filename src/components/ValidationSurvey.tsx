@@ -89,8 +89,8 @@ const ValidationSurvey = () => {
               </div>
               <h3 className="text-2xl font-bold mb-4">Feedback Submitted!</h3>
               <p className="text-muted-foreground mb-6">
-                Thank you for helping us improve the AI surf coach. Your feedback is invaluable 
-                for making better coaching tools for the surf community.
+                Thank you for helping us improve SurfPilot. Your feedback is invaluable 
+                for making better AI coaching tools for the surf community.
               </p>
               <Button variant="hero" onClick={() => window.location.reload()}>
                 Analyze Another Video
@@ -108,7 +108,7 @@ const ValidationSurvey = () => {
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold mb-4">Help Us Improve</h2>
           <p className="text-xl text-muted-foreground">
-            Quick feedback to make the AI coach even better
+            Quick feedback to make SurfPilot even better
           </p>
         </div>
 
