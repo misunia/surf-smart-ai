@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, Play, Scissors, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import SkillLevelSelector from "./SkillLevelSelector";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -14,6 +15,7 @@ const VideoUpload = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [skillLevel, setSkillLevel] = useState<'beginner' | 'intermediate' | 'advanced' | 'pro' | null>(null);
   const [showSkillSelector, setShowSkillSelector] = useState(false);
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const handleFileSelect = useCallback((file: File) => {
@@ -80,14 +82,15 @@ const VideoUpload = () => {
 
     setIsAnalyzing(true);
     try {
-      // Get current user (for now, we'll use a placeholder until auth is implemented)
-      const userId = 'placeholder-user-id';
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
       
       // Create analysis session in database
       const { data: session, error } = await supabase
         .from('analysis_sessions')
         .insert({
-          user_id: userId,
+          user_id: user.id,
           technique: 'bottom_turn',
           wave_type: 'beach_break',
           skill_level: skillLevel,

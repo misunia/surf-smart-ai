@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Target, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const FeedbackDashboard = () => {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [standards, setStandards] = useState<any[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchLatestAnalysis();
@@ -16,11 +18,13 @@ const FeedbackDashboard = () => {
   }, []);
 
   const fetchLatestAnalysis = async () => {
+    if (!user) return;
+    
     try {
       const { data: sessions, error } = await supabase
         .from('analysis_sessions')
         .select('*')
-        .eq('user_id', 'placeholder-user-id')
+        .eq('user_id', user.id)
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(1);
