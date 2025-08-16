@@ -4,12 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, Play, Scissors, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import SkillLevelSelector from "./SkillLevelSelector";
+import { supabase } from "@/integrations/supabase/client";
 
 const VideoUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [skillLevel, setSkillLevel] = useState<'beginner' | 'intermediate' | 'advanced' | 'pro' | null>(null);
+  const [showSkillSelector, setShowSkillSelector] = useState(false);
   const { toast } = useToast();
 
   const handleFileSelect = useCallback((file: File) => {
@@ -54,16 +58,85 @@ const VideoUpload = () => {
     }
   };
 
-  const startAnalysis = () => {
+  const handleSkillLevelSelect = (level: 'beginner' | 'intermediate' | 'advanced' | 'pro') => {
+    setSkillLevel(level);
+    setShowSkillSelector(false);
+    toast({
+      title: "Skill level selected!",
+      description: `Analysis will be optimized for ${level} level`,
+    });
+  };
+
+  const startAnalysis = async () => {
+    if (!skillLevel) {
+      setShowSkillSelector(true);
+      toast({
+        title: "Select your skill level first",
+        description: "This helps us provide personalized feedback",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsAnalyzing(true);
-    // Simulate AI analysis
-    setTimeout(() => {
+    try {
+      // Get current user (for now, we'll use a placeholder until auth is implemented)
+      const userId = 'placeholder-user-id';
+      
+      // Create analysis session in database
+      const { data: session, error } = await supabase
+        .from('analysis_sessions')
+        .insert({
+          user_id: userId,
+          technique: 'bottom_turn',
+          wave_type: 'beach_break',
+          skill_level: skillLevel,
+          status: 'processing'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Simulate AI analysis
+      setTimeout(async () => {
+        // Update session with mock results
+        await supabase
+          .from('analysis_sessions')
+          .update({
+            status: 'completed',
+            overall_score: Math.floor(Math.random() * 30) + 70, // 70-100
+            analysis_data: {
+              metrics: [
+                { name: "Turn Completion", score: Math.floor(Math.random() * 20) + 80 },
+                { name: "Body Rotation", score: Math.floor(Math.random() * 25) + 75 },
+                { name: "Weight Distribution", score: Math.floor(Math.random() * 30) + 70 },
+                { name: "Rail Engagement", score: Math.floor(Math.random() * 20) + 80 }
+              ]
+            },
+            feedback_data: {
+              tips: [
+                "Focus on completing your turn arc for better flow",
+                "Your body rotation timing is good for " + skillLevel + " level"
+              ]
+            }
+          })
+          .eq('id', session.id);
+
+        setIsAnalyzing(false);
+        toast({
+          title: "Analysis complete!",
+          description: "Check your technique feedback below",
+        });
+      }, 3000);
+    } catch (error) {
       setIsAnalyzing(false);
       toast({
-        title: "Analysis complete!",
-        description: "Check your technique feedback below",
+        title: "Analysis failed",
+        description: "Please try again",
+        variant: "destructive"
       });
-    }, 3000);
+    }
   };
 
   return (
@@ -77,6 +150,15 @@ const VideoUpload = () => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          {/* Skill Level Selector */}
+          {showSkillSelector && (
+            <div className="lg:col-span-2 mb-6">
+              <SkillLevelSelector 
+                onSkillLevelSelect={handleSkillLevelSelect}
+                selectedSkillLevel={skillLevel || undefined}
+              />
+            </div>
+          )}
           {/* Upload Section */}
           <Card className="shadow-wave">
             <CardHeader>
@@ -126,26 +208,31 @@ const VideoUpload = () => {
                       </div>
                       <Progress value={uploadProgress} className="h-2" />
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <Button 
-                        variant="wave" 
-                        className="w-full" 
-                        onClick={startAnalysis}
-                        disabled={isAnalyzing}
-                      >
-                        {isAnalyzing ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
-                            Analyzing...
-                          </>
-                        ) : (
-                          <>
-                            <Play className="mr-2 h-4 w-4" />
-                            Start AI Analysis
-                          </>
-                        )}
-                      </Button>
+                   ) : (
+                     <div className="space-y-3">
+                       {skillLevel && (
+                         <div className="text-sm text-muted-foreground text-center mb-2">
+                           Analysis level: <span className="font-medium capitalize">{skillLevel}</span>
+                         </div>
+                       )}
+                       <Button 
+                         variant="wave" 
+                         className="w-full" 
+                         onClick={startAnalysis}
+                         disabled={isAnalyzing}
+                       >
+                         {isAnalyzing ? (
+                           <>
+                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
+                             Analyzing...
+                           </>
+                         ) : (
+                           <>
+                             <Play className="mr-2 h-4 w-4" />
+                             Start AI Analysis
+                           </>
+                         )}
+                       </Button>
                       
                       <Button variant="outline" className="w-full">
                         <Scissors className="mr-2 h-4 w-4" />

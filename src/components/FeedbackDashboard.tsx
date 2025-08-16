@@ -1,41 +1,121 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Target, AlertCircle, CheckCircle2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const FeedbackDashboard = () => {
-  const analysisData = {
-    overallScore: 87,
-    metrics: [
-      { name: "Shoulder Rotation", score: 92, ideal: "45-55°", actual: "52°", status: "good" },
-      { name: "Knee Bend", score: 78, ideal: "90-120°", actual: "135°", status: "warning" },
-      { name: "Board Lean", score: 85, ideal: "30-40°", actual: "38°", status: "good" },
-      { name: "Weight Distribution", score: 94, ideal: "60/40", actual: "58/42", status: "excellent" }
-    ],
-    feedback: [
-      {
-        type: "improvement",
-        title: "Reduce Knee Bend",
-        description: "Your knee bend is too extreme at 135°. Try to keep it between 90-120° for better control.",
-        icon: AlertCircle,
-        priority: "high"
-      },
-      {
-        type: "success",
-        title: "Perfect Shoulder Position",
-        description: "Excellent shoulder rotation at 52°. This is helping you generate great speed through the turn.",
-        icon: CheckCircle2,
-        priority: "low"
-      },
-      {
-        type: "tip",
-        title: "Weight Distribution",
-        description: "Your 58/42 weight distribution is excellent. This is generating optimal board response.",
-        icon: Target,
-        priority: "medium"
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [standards, setStandards] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchLatestAnalysis();
+    fetchTechniqueStandards();
+  }, []);
+
+  const fetchLatestAnalysis = async () => {
+    try {
+      const { data: sessions, error } = await supabase
+        .from('analysis_sessions')
+        .select('*')
+        .eq('user_id', 'placeholder-user-id')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      
+      if (sessions && sessions.length > 0) {
+        const session = sessions[0];
+        const analysisDataObj = typeof session.analysis_data === 'object' ? session.analysis_data as any : {};
+        const feedbackDataObj = typeof session.feedback_data === 'object' ? session.feedback_data as any : {};
+        
+        setAnalysisData({
+          overallScore: session.overall_score || 0,
+          skillLevel: session.skill_level,
+          metrics: analysisDataObj?.metrics || [],
+          feedback: feedbackDataObj?.tips || []
+        });
       }
-    ]
+    } catch (error) {
+      console.error('Error fetching analysis:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const fetchTechniqueStandards = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('technique_standards')
+        .select('*')
+        .eq('technique', 'bottom_turn')
+        .eq('wave_type', 'beach_break');
+
+      if (error) throw error;
+      setStandards(data || []);
+    } catch (error) {
+      console.error('Error fetching standards:', error);
+    }
+  };
+
+  const getIdealRange = (metricName: string, skillLevel: string) => {
+    const standard = standards.find(s => 
+      s.metric_name.toLowerCase() === metricName.toLowerCase().replace(' ', '_') && 
+      s.skill_level === skillLevel
+    );
+    
+    if (standard) {
+      return `${standard.ideal_min}-${standard.ideal_max}${standard.units ? ' ' + standard.units : ''}`;
+    }
+    return "Loading...";
+  };
+
+  const getScoreStatus = (score: number, skillLevel: string) => {
+    // Adjust expectations based on skill level
+    const thresholds = {
+      beginner: { excellent: 80, good: 60 },
+      intermediate: { excellent: 85, good: 70 },
+      advanced: { excellent: 90, good: 80 },
+      pro: { excellent: 95, good: 90 }
+    };
+    
+    const levels = thresholds[skillLevel as keyof typeof thresholds] || thresholds.beginner;
+    
+    if (score >= levels.excellent) return "excellent";
+    if (score >= levels.good) return "good";
+    return "warning";
+  };
+
+  if (loading) {
+    return (
+      <section className="py-24 bg-background">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">Loading analysis results...</span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!analysisData) {
+    return (
+      <section className="py-24 bg-background">
+        <div className="container mx-auto px-6">
+          <div className="text-center">
+            <h2 className="text-4xl font-bold mb-4">No Analysis Yet</h2>
+            <p className="text-xl text-muted-foreground">
+              Upload and analyze a video to see your results here
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return "text-accent";
@@ -59,12 +139,12 @@ const FeedbackDashboard = () => {
   return (
     <section className="py-24 bg-background">
       <div className="container mx-auto px-6">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">AI Analysis Results</h2>
-          <p className="text-xl text-muted-foreground">
-            Your bottom turn technique breakdown with personalized feedback
-          </p>
-        </div>
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold mb-4">AI Analysis Results</h2>
+            <p className="text-xl text-muted-foreground">
+              Your bottom turn analysis - optimized for <span className="capitalize font-semibold">{analysisData.skillLevel}</span> level
+            </p>
+          </div>
 
         <div className="max-w-6xl mx-auto">
           {/* Overall Score */}
@@ -80,73 +160,66 @@ const FeedbackDashboard = () => {
                 </div>
               </div>
               <p className="text-muted-foreground">
-                Great technique! Focus on knee bend for improvement.
+                {analysisData.overallScore >= 90 ? "Excellent technique!" : 
+                 analysisData.overallScore >= 75 ? "Good technique! Keep practicing." : 
+                 "Room for improvement. Focus on the highlighted areas."}
               </p>
             </CardContent>
           </Card>
 
           {/* Metrics Grid */}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {analysisData.metrics.map((metric, index) => (
-              <Card key={index} className="shadow-wave hover:shadow-depth transition-all duration-300">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    {metric.name}
-                    {getStatusBadge(metric.status)}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl font-bold ${getScoreColor(metric.score)}">
-                        {metric.score}%
-                      </span>
-                      {metric.score >= 85 ? (
-                        <TrendingUp className="h-5 w-5 text-accent" />
-                      ) : (
-                        <TrendingDown className="h-5 w-5 text-destructive" />
-                      )}
-                    </div>
-                    <Progress value={metric.score} className="h-2" />
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Ideal:</span>
-                        <span>{metric.ideal}</span>
+            {analysisData.metrics.map((metric: any, index: number) => {
+              const status = getScoreStatus(metric.score, analysisData.skillLevel);
+              const idealRange = getIdealRange(metric.name, analysisData.skillLevel);
+              
+              return (
+                <Card key={index} className="shadow-wave hover:shadow-depth transition-all duration-300">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      {metric.name}
+                      {getStatusBadge(status)}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-2xl font-bold ${getScoreColor(metric.score)}`}>
+                          {metric.score}%
+                        </span>
+                        {metric.score >= 85 ? (
+                          <TrendingUp className="h-5 w-5 text-accent" />
+                        ) : (
+                          <TrendingDown className="h-5 w-5 text-destructive" />
+                        )}
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Your:</span>
-                        <span className="font-medium">{metric.actual}</span>
+                      <Progress value={metric.score} className="h-2" />
+                      <div className="text-sm space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Ideal for {analysisData.skillLevel}:</span>
+                          <span>{idealRange}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Feedback Cards */}
           <div className="space-y-4">
-            <h3 className="text-2xl font-bold mb-6">Personalized Coaching Tips</h3>
-            {analysisData.feedback.map((item, index) => (
+            <h3 className="text-2xl font-bold mb-6">Personalized Coaching Tips for {analysisData.skillLevel.charAt(0).toUpperCase() + analysisData.skillLevel.slice(1)} Level</h3>
+            {analysisData.feedback.map((tip: string, index: number) => (
               <Card key={index} className="shadow-wave hover:shadow-depth transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex gap-4">
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
-                      item.type === 'success' ? 'bg-accent/10 text-accent' :
-                      item.type === 'improvement' ? 'bg-destructive/10 text-destructive' :
-                      'bg-primary/10 text-primary'
-                    }`}>
-                      <item.icon className="h-6 w-6" />
+                    <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center bg-primary/10 text-primary">
+                      <Target className="h-6 w-6" />
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="text-lg font-semibold">{item.title}</h4>
-                        <Badge variant={item.priority === 'high' ? 'destructive' : 'secondary'}>
-                          {item.priority} priority
-                        </Badge>
-                      </div>
                       <p className="text-muted-foreground leading-relaxed">
-                        {item.description}
+                        {tip}
                       </p>
                     </div>
                   </div>
