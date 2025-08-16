@@ -1,1 +1,4 @@
 project_id = "ojcrbchrhlsidfyfwknt"
+
+[functions.analyze-surf-video]
+verify_jwt = false

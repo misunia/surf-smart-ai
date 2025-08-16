@@ -80,6 +80,15 @@ const VideoUpload = () => {
       return;
     }
 
+    if (!videoFile) {
+      toast({
+        title: "No video file",
+        description: "Please upload a video first",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsAnalyzing(true);
     try {
       if (!user) {
@@ -87,7 +96,7 @@ const VideoUpload = () => {
       }
       
       // Create analysis session in database
-      const { data: session, error } = await supabase
+      const { data: session, error: sessionError } = await supabase
         .from('analysis_sessions')
         .insert({
           user_id: user.id,
@@ -99,44 +108,58 @@ const VideoUpload = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (sessionError || !session) {
+        throw new Error('Failed to create analysis session');
+      }
 
-      // Simulate AI analysis
-      setTimeout(async () => {
-        // Update session with mock results
-        await supabase
-          .from('analysis_sessions')
-          .update({
-            status: 'completed',
-            overall_score: Math.floor(Math.random() * 30) + 70, // 70-100
-            analysis_data: {
-              metrics: [
-                { name: "Turn Completion", score: Math.floor(Math.random() * 20) + 80 },
-                { name: "Body Rotation", score: Math.floor(Math.random() * 25) + 75 },
-                { name: "Weight Distribution", score: Math.floor(Math.random() * 30) + 70 },
-                { name: "Rail Engagement", score: Math.floor(Math.random() * 20) + 80 }
-              ]
-            },
-            feedback_data: {
-              tips: [
-                "Focus on completing your turn arc for better flow",
-                "Your body rotation timing is good for " + skillLevel + " level"
-              ]
-            }
-          })
-          .eq('id', session.id);
+      // Upload video to storage
+      const fileName = `${user.id}/${session.id}-${videoFile.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('surf-videos')
+        .upload(fileName, videoFile);
 
-        setIsAnalyzing(false);
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // Update session with video URL
+      const { error: updateError } = await supabase
+        .from('analysis_sessions')
+        .update({ video_url: uploadData.path })
+        .eq('id', session.id);
+
+      if (updateError) {
+        throw new Error('Failed to update session');
+      }
+
+      // Start AI analysis
+      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-surf-video', {
+        body: {
+          sessionId: session.id,
+          videoPath: uploadData.path
+        }
+      });
+
+      if (analysisError) {
+        console.error('Analysis error:', analysisError);
+        toast({
+          title: "Analysis started",
+          description: "Your video is being processed in the background",
+        });
+      } else {
         toast({
           title: "Analysis complete!",
           description: "Check your technique feedback below",
         });
-      }, 3000);
+      }
+
+      setIsAnalyzing(false);
     } catch (error) {
       setIsAnalyzing(false);
+      console.error('Analysis error:', error);
       toast({
         title: "Analysis failed",
-        description: "Please try again",
+        description: error instanceof Error ? error.message : "Please try again",
         variant: "destructive"
       });
     }
