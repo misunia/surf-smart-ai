@@ -14,7 +14,129 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analysis_sessions: {
+        Row: {
+          analysis_data: Json | null
+          created_at: string | null
+          feedback_data: Json | null
+          id: string
+          overall_score: number | null
+          skill_level: Database["public"]["Enums"]["skill_level"]
+          status: string | null
+          technique: Database["public"]["Enums"]["surf_technique"]
+          updated_at: string | null
+          user_id: string
+          video_url: string | null
+          wave_type: Database["public"]["Enums"]["wave_type"]
+        }
+        Insert: {
+          analysis_data?: Json | null
+          created_at?: string | null
+          feedback_data?: Json | null
+          id?: string
+          overall_score?: number | null
+          skill_level: Database["public"]["Enums"]["skill_level"]
+          status?: string | null
+          technique: Database["public"]["Enums"]["surf_technique"]
+          updated_at?: string | null
+          user_id: string
+          video_url?: string | null
+          wave_type: Database["public"]["Enums"]["wave_type"]
+        }
+        Update: {
+          analysis_data?: Json | null
+          created_at?: string | null
+          feedback_data?: Json | null
+          id?: string
+          overall_score?: number | null
+          skill_level?: Database["public"]["Enums"]["skill_level"]
+          status?: string | null
+          technique?: Database["public"]["Enums"]["surf_technique"]
+          updated_at?: string | null
+          user_id?: string
+          video_url?: string | null
+          wave_type?: Database["public"]["Enums"]["wave_type"]
+        }
+        Relationships: []
+      }
+      technique_standards: {
+        Row: {
+          acceptable_max: number | null
+          acceptable_min: number | null
+          created_at: string | null
+          description: string | null
+          good_max: number | null
+          good_min: number | null
+          id: string
+          ideal_max: number | null
+          ideal_min: number | null
+          metric_name: string
+          skill_level: Database["public"]["Enums"]["skill_level"]
+          technique: Database["public"]["Enums"]["surf_technique"]
+          units: string | null
+          wave_type: Database["public"]["Enums"]["wave_type"]
+        }
+        Insert: {
+          acceptable_max?: number | null
+          acceptable_min?: number | null
+          created_at?: string | null
+          description?: string | null
+          good_max?: number | null
+          good_min?: number | null
+          id?: string
+          ideal_max?: number | null
+          ideal_min?: number | null
+          metric_name: string
+          skill_level: Database["public"]["Enums"]["skill_level"]
+          technique: Database["public"]["Enums"]["surf_technique"]
+          units?: string | null
+          wave_type: Database["public"]["Enums"]["wave_type"]
+        }
+        Update: {
+          acceptable_max?: number | null
+          acceptable_min?: number | null
+          created_at?: string | null
+          description?: string | null
+          good_max?: number | null
+          good_min?: number | null
+          id?: string
+          ideal_max?: number | null
+          ideal_min?: number | null
+          metric_name?: string
+          skill_level?: Database["public"]["Enums"]["skill_level"]
+          technique?: Database["public"]["Enums"]["surf_technique"]
+          units?: string | null
+          wave_type?: Database["public"]["Enums"]["wave_type"]
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          created_at: string | null
+          id: string
+          preferred_wave_type: Database["public"]["Enums"]["wave_type"] | null
+          skill_level: Database["public"]["Enums"]["skill_level"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          preferred_wave_type?: Database["public"]["Enums"]["wave_type"] | null
+          skill_level?: Database["public"]["Enums"]["skill_level"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          preferred_wave_type?: Database["public"]["Enums"]["wave_type"] | null
+          skill_level?: Database["public"]["Enums"]["skill_level"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +145,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      skill_level: "beginner" | "intermediate" | "advanced" | "pro"
+      surf_technique: "bottom_turn" | "cutback" | "top_turn" | "tube_ride"
+      wave_type: "beach_break" | "point_break" | "reef_break"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +274,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      skill_level: ["beginner", "intermediate", "advanced", "pro"],
+      surf_technique: ["bottom_turn", "cutback", "top_turn", "tube_ride"],
+      wave_type: ["beach_break", "point_break", "reef_break"],
+    },
   },
 } as const
