@@ -5,11 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Target, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import PoseVisualization from "./PoseVisualization";
+import MetricsChart from "./MetricsChart";
 
 const FeedbackDashboard = () => {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [standards, setStandards] = useState<any[]>([]);
+  const [frameData, setFrameData] = useState<any[]>([]);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -40,8 +43,30 @@ const FeedbackDashboard = () => {
           overallScore: session.overall_score || 0,
           skillLevel: session.skill_level,
           metrics: analysisDataObj?.metrics || [],
-          feedback: feedbackDataObj?.tips || []
+          feedback: feedbackDataObj?.tips || [],
+          frameAnalysis: analysisDataObj?.frameAnalysis || [],
+          videoUrl: session.video_url
         });
+
+        // Process frame data for visualization
+        if (analysisDataObj?.frameAnalysis) {
+          const processedFrames = analysisDataObj.frameAnalysis.map((frame: any, index: number) => ({
+            frameNumber: index + 1,
+            timestamp: frame.timestamp || (index * 0.5), // Assume 0.5s intervals if no timestamp
+            bodyRotation: frame.bodyRotation || 0,
+            stanceWidth: frame.stanceWidth || 0.5,
+            kneeFlexion: frame.kneeFlexion || 45,
+            balance: frame.balanceScore || 50,
+            poses: frame.poses || [],
+            metrics: {
+              bodyRotation: frame.bodyRotation || 0,
+              centerOfGravity: frame.centerOfGravity || { x: 50, y: 50 },
+              stanceWidth: frame.stanceWidth || 0.5,
+              kneeFlexion: frame.kneeFlexion || 45
+            }
+          }));
+          setFrameData(processedFrames);
+        }
       }
     } catch (error) {
       console.error('Error fetching analysis:', error);
@@ -210,6 +235,28 @@ const FeedbackDashboard = () => {
               );
             })}
           </div>
+
+          {/* Pose Visualization */}
+          {frameData.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-2xl font-bold mb-6">Frame-by-Frame Analysis</h3>
+              <PoseVisualization 
+                frames={frameData} 
+                videoUrl={analysisData.videoUrl}
+              />
+            </div>
+          )}
+
+          {/* Performance Charts */}
+          {frameData.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-2xl font-bold mb-6">Performance Visualization</h3>
+              <MetricsChart 
+                frameData={frameData}
+                skillLevel={analysisData.skillLevel}
+              />
+            </div>
+          )}
 
           {/* Feedback Cards */}
           <div className="space-y-4">
