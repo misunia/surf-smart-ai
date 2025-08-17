@@ -104,7 +104,7 @@ const VideoUpload = () => {
         description: "Processing your video frames"
       });
 
-      const frames = await extractFramesFromVideo(videoFile, 5);
+      const frames = await extractFramesFromVideo(videoFile, 100);
       
       // Step 2: Initialize pose detection
       toast({
