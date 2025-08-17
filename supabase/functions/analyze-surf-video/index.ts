@@ -373,7 +373,13 @@ serve(async (req) => {
   }
 
   try {
-    const { sessionId, videoPath, frameAnalysis, skillLevel } = await req.json();
+    const requestBody = await req.json();
+    console.log('Request body keys:', Object.keys(requestBody));
+    console.log('frameAnalysis type:', typeof requestBody.frameAnalysis);
+    console.log('frameAnalysis length:', requestBody.frameAnalysis?.length);
+    console.log('frameAnalysis exists:', !!requestBody.frameAnalysis);
+    
+    const { sessionId, videoPath, frameAnalysis, skillLevel } = requestBody;
     
     if (!sessionId) {
       throw new Error('Session ID is required');
@@ -414,11 +420,21 @@ serve(async (req) => {
 
     let analysisData;
     
-    // Check if client provided frameAnalysis data
+    console.log('=== FRAME ANALYSIS DEBUG ===');
+    console.log('frameAnalysis exists:', !!frameAnalysis);
+    console.log('frameAnalysis type:', typeof frameAnalysis);
+    console.log('frameAnalysis length:', frameAnalysis?.length);
+    console.log('frameAnalysis is array:', Array.isArray(frameAnalysis));
     if (frameAnalysis && frameAnalysis.length > 0) {
-      console.log(`Using client-provided frame analysis data (${frameAnalysis.length} frames)`);
+      console.log('First frame keys:', Object.keys(frameAnalysis[0] || {}));
+      console.log('First frame has imageData:', !!frameAnalysis[0]?.imageData);
+    }
+    console.log('=== END DEBUG ===');
+
+    // Check if client provided frameAnalysis data
+    if (frameAnalysis && Array.isArray(frameAnalysis) && frameAnalysis.length > 0) {
+      console.log(`✓ Using client-provided frame analysis data (${frameAnalysis.length} frames)`);
       console.log('Sample frame data keys:', Object.keys(frameAnalysis[0] || {}));
-      console.log('Has frameAnalysis:', !!frameAnalysis, 'frames:', frameAnalysis?.length);
       
       // Store frame images in Supabase Storage and keep URLs in frameAnalysis
       console.log('Starting frame image upload process...');
