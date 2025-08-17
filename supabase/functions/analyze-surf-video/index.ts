@@ -418,26 +418,34 @@ serve(async (req) => {
     if (frameAnalysis && frameAnalysis.length > 0) {
       console.log(`Using client-provided frame analysis data (${frameAnalysis.length} frames)`);
       console.log('Sample frame data keys:', Object.keys(frameAnalysis[0] || {}));
-      
-      // Use the client-provided frame analysis directly
-      analysisData = processClientFrameAnalysis(frameAnalysis, skillLevel || session.skill_level);
+      console.log('Has frameAnalysis:', !!frameAnalysis, 'frames:', frameAnalysis?.length);
       
       // Store frame images in Supabase Storage and keep URLs in frameAnalysis
+      console.log('Starting frame image upload process...');
       const frameAnalysisWithUrls = [];
       
       for (let i = 0; i < frameAnalysis.length; i++) {
         const frame = frameAnalysis[i];
         let frameImageUrl = null;
         
+        console.log(`Processing frame ${i + 1}/${frameAnalysis.length}, has imageData:`, !!frame.imageData);
+        
         if (frame.imageData) {
           try {
             // Convert base64 to blob
             const base64Data = frame.imageData.split(',')[1];
+            if (!base64Data) {
+              console.error(`Frame ${i}: Invalid base64 data format`);
+              continue;
+            }
+            
             const binaryString = atob(base64Data);
             const bytes = new Uint8Array(binaryString.length);
             for (let j = 0; j < binaryString.length; j++) {
               bytes[j] = binaryString.charCodeAt(j);
             }
+            
+            console.log(`Frame ${i}: Converted to ${bytes.length} bytes`);
             
             // Upload to storage
             const fileName = `${sessionId}/frame_${i}.jpg`;
@@ -454,24 +462,33 @@ serve(async (req) => {
                 .from('surf-videos')
                 .getPublicUrl(fileName);
               frameImageUrl = urlData.publicUrl;
-              console.log(`Stored frame ${i} at:`, frameImageUrl);
+              console.log(`✓ Frame ${i} uploaded successfully:`, frameImageUrl);
             } else {
-              console.error(`Failed to upload frame ${i}:`, uploadError);
+              console.error(`✗ Frame ${i} upload failed:`, uploadError);
             }
           } catch (error) {
-            console.error(`Error processing frame ${i}:`, error);
+            console.error(`✗ Error processing frame ${i}:`, error);
           }
+        } else {
+          console.warn(`Frame ${i}: No imageData found`);
         }
         
         frameAnalysisWithUrls.push({
           ...frame,
-          imageData: frame.imageData, // Keep original for now
+          imageData: frame.imageData, // Keep original for frontend
           imageUrl: frameImageUrl // Add URL reference
         });
       }
       
+      console.log(`Frame upload complete. Processed ${frameAnalysisWithUrls.length} frames`);
+      
+      // Process the client frame analysis to get metrics and scores
+      console.log('Processing client frame analysis for metrics...');
+      analysisData = await processClientFrameAnalysis(frameAnalysis, skillLevel || session.skill_level);
+      
+      // CRITICAL: Add the frameAnalysis data to the final result
       analysisData.frameAnalysis = frameAnalysisWithUrls;
-      console.log('Stored frameAnalysis with', analysisData.frameAnalysis.length, 'frames and URLs');
+      console.log('✓ Added frameAnalysis to analysisData. Final frameAnalysis count:', analysisData.frameAnalysis.length);
       
     } else if (useMockData) {
       console.log('Using MediaPipe pose analysis for surf video');
