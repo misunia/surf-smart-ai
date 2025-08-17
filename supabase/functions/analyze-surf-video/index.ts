@@ -281,6 +281,52 @@ function generateMockFrameData(index: number): any {
   };
 }
 
+// Process client-provided frame analysis
+async function processClientFrameAnalysis(frameAnalysis: any[], skillLevel: string) {
+  console.log(`Processing ${frameAnalysis.length} client-analyzed frames for ${skillLevel} level`);
+  
+  // Calculate overall metrics from frame analysis
+  const avgBodyRotation = frameAnalysis.reduce((sum, frame) => sum + (frame.metrics?.bodyRotation || 0), 0) / frameAnalysis.length;
+  const avgStanceWidth = frameAnalysis.reduce((sum, frame) => sum + (frame.metrics?.stanceWidth || 0.5), 0) / frameAnalysis.length;
+  const avgKneeFlexion = frameAnalysis.reduce((sum, frame) => sum + (frame.metrics?.kneeFlexion || 45), 0) / frameAnalysis.length;
+  
+  // Calculate scores based on client analysis
+  const bodyRotationScore = Math.min(100, Math.max(0, 100 - Math.abs(avgBodyRotation - 15) * 2));
+  const stanceWidthScore = Math.min(100, avgStanceWidth * 150);
+  const kneeFlexionScore = Math.min(100, (avgKneeFlexion / 90) * 100);
+  const balanceScore = frameAnalysis.reduce((sum, frame) => {
+    const cog = frame.metrics?.centerOfGravity || { x: 50, y: 50 };
+    return sum + Math.min(100, Math.max(0, 100 - Math.abs(cog.x - 50)));
+  }, 0) / frameAnalysis.length;
+
+  const metrics = [
+    { name: "Stance Width", score: Math.round(stanceWidthScore), trend: "stable", value: avgStanceWidth.toFixed(2) },
+    { name: "Body Rotation", score: Math.round(bodyRotationScore), trend: "stable", value: `${avgBodyRotation.toFixed(1)}°` },
+    { name: "Knee Flexion", score: Math.round(kneeFlexionScore), trend: "stable", value: `${avgKneeFlexion.toFixed(1)}°` },
+    { name: "Balance Control", score: Math.round(balanceScore), trend: "stable", value: "Good" }
+  ];
+
+  const overallScore = metrics.reduce((sum, metric) => sum + metric.score, 0) / metrics.length;
+
+  return {
+    overallScore: Math.round(overallScore),
+    metrics,
+    frameAnalysis,
+    pose_analysis: {
+      frameCount: frameAnalysis.length,
+      avgStanceWidth,
+      avgBodyRotation,
+      avgKneeFlexion,
+      poseProgression: frameAnalysis.map(frame => ({
+        timestamp: frame.timestamp,
+        centerOfGravity: frame.metrics?.centerOfGravity || { x: 50, y: 50 },
+        bodyRotation: frame.metrics?.bodyRotation || 0
+      }))
+    },
+    processed: true
+  };
+}
+
 function calculateSurfMetrics(poseData: any[], skillLevel: string): any {
   console.log(`Calculating surf metrics for ${skillLevel} level`);
   
@@ -327,10 +373,10 @@ serve(async (req) => {
   }
 
   try {
-    const { sessionId, videoPath } = await req.json();
+    const { sessionId, videoPath, frameAnalysis, skillLevel } = await req.json();
     
-    if (!sessionId || !videoPath) {
-      throw new Error('Session ID and video path are required');
+    if (!sessionId) {
+      throw new Error('Session ID is required');
     }
 
     const openAIKey = Deno.env.get('OPENAI_API_KEY');
@@ -477,10 +523,10 @@ serve(async (req) => {
       .from('analysis_sessions')
       .update({
         status: 'completed',
-        overall_score: analysisData.overall_score,
+        overall_score: analysisData.overallScore || analysisData.overall_score,
         analysis_data: analysisData,
         feedback_data: {
-          tips: analysisData.recommendations
+          tips: feedback
         }
       })
       .eq('id', sessionId);

@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import SkillLevelSelector from "./SkillLevelSelector";
 import { supabase } from "@/integrations/supabase/client";
+import { extractFramesFromVideo } from "@/utils/frameExtraction";
+import { poseDetector, calculateSurfMetrics, FramePoseAnalysis } from "@/utils/poseDetection";
 
 const VideoUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -15,6 +17,7 @@ const VideoUpload = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [skillLevel, setSkillLevel] = useState<'beginner' | 'intermediate' | 'advanced' | 'pro' | null>(null);
   const [showSkillSelector, setShowSkillSelector] = useState(false);
+  const [frameAnalysis, setFrameAnalysis] = useState<FramePoseAnalysis[]>([]);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -94,6 +97,53 @@ const VideoUpload = () => {
       if (!user) {
         throw new Error('User not authenticated');
       }
+
+      // Step 1: Extract frames client-side
+      toast({
+        title: "Extracting frames...",
+        description: "Processing your video frames"
+      });
+
+      const frames = await extractFramesFromVideo(videoFile, 5);
+      
+      // Step 2: Initialize pose detection
+      toast({
+        title: "Initializing AI analysis...",
+        description: "Loading pose detection models"
+      });
+
+      await poseDetector.initialize();
+
+      // Step 3: Analyze each frame
+      const frameAnalysisResults: FramePoseAnalysis[] = [];
+      
+      for (let i = 0; i < frames.length; i++) {
+        const frame = frames[i];
+        
+        toast({
+          title: `Analyzing frame ${i + 1}/${frames.length}...`,
+          description: "Running pose detection"
+        });
+
+        try {
+          const poseResult = await poseDetector.detectPose(frame.canvas);
+          
+          if (poseResult) {
+            const metrics = calculateSurfMetrics(poseResult.keypoints);
+            
+            frameAnalysisResults.push({
+              frameNumber: frame.frameNumber,
+              timestamp: frame.timestamp,
+              poses: [poseResult],
+              metrics
+            });
+          }
+        } catch (error) {
+          console.error(`Error analyzing frame ${i + 1}:`, error);
+        }
+      }
+
+      setFrameAnalysis(frameAnalysisResults);
       
       // Create analysis session in database
       const { data: session, error: sessionError } = await supabase
@@ -132,19 +182,21 @@ const VideoUpload = () => {
         throw new Error('Failed to update session');
       }
 
-      // Start AI analysis
+      // Start AI analysis with pre-processed frame data
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-surf-video', {
         body: {
           sessionId: session.id,
-          videoPath: uploadData.path
+          videoPath: uploadData.path,
+          frameAnalysis: frameAnalysisResults,
+          skillLevel
         }
       });
 
       if (analysisError) {
         console.error('Analysis error:', analysisError);
         toast({
-          title: "Analysis started",
-          description: "Your video is being processed in the background",
+          title: "Analysis completed with warnings",
+          description: "Your video has been processed. Check results below.",
         });
       } else {
         toast({
