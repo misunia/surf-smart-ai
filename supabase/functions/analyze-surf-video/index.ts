@@ -414,7 +414,17 @@ serve(async (req) => {
 
     let analysisData;
     
-    if (useMockData) {
+    // Check if client provided frameAnalysis data
+    if (frameAnalysis && frameAnalysis.length > 0) {
+      console.log(`Using client-provided frame analysis data (${frameAnalysis.length} frames)`);
+      
+      // Use the client-provided frame analysis directly
+      analysisData = processClientFrameAnalysis(frameAnalysis, skillLevel || session.skill_level);
+      
+      // Store the frameAnalysis data for visualization
+      analysisData.frameAnalysis = frameAnalysis;
+      
+    } else if (useMockData) {
       console.log('Using MediaPipe pose analysis for surf video');
       
       // Step 1: Extract frames from video
