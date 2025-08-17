@@ -24,6 +24,7 @@ export interface FramePoseAnalysis {
     stanceWidth: number;
     kneeFlexion: number;
   };
+  poseDetectionError?: string; // Error message when pose detection fails
 }
 
 class MediaPipePoseDetector {

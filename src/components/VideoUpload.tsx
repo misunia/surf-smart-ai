@@ -116,6 +116,7 @@ const VideoUpload = () => {
 
       // Step 3: Analyze each frame
       const frameAnalysisResults: FramePoseAnalysis[] = [];
+      console.log(`🎬 Starting frame analysis for ${frames.length} frames`);
       
       for (let i = 0; i < frames.length; i++) {
         const frame = frames[i];
@@ -125,24 +126,60 @@ const VideoUpload = () => {
           description: "Running pose detection"
         });
 
+        console.log(`🔍 Processing frame ${i + 1}/${frames.length}...`);
+        
+        let poseDetectionError = null;
+        let poseResult = null;
+        let metrics = null;
+        
         try {
-          const poseResult = await poseDetector.detectPose(frame.canvas);
+          console.log(`🤖 Attempting pose detection on frame ${i + 1}...`);
+          poseResult = await poseDetector.detectPose(frame.canvas);
           
-          if (poseResult) {
-            const metrics = calculateSurfMetrics(poseResult.keypoints);
-            
-            frameAnalysisResults.push({
-              frameNumber: frame.frameNumber,
-              timestamp: frame.timestamp,
-              imageData: frame.imageData, // Include base64 frame image
-              poses: [poseResult],
-              metrics
+          if (poseResult && poseResult.keypoints.length > 0) {
+            console.log(`✅ Pose detected on frame ${i + 1} with ${poseResult.keypoints.length} keypoints`);
+            metrics = calculateSurfMetrics(poseResult.keypoints);
+            console.log(`📊 Surf metrics calculated for frame ${i + 1}:`, {
+              bodyRotation: metrics.bodyRotation,
+              stanceWidth: metrics.stanceWidth,
+              kneeFlexion: metrics.kneeFlexion
             });
+          } else {
+            poseDetectionError = 'No human pose detected in frame';
+            console.log(`⚠️ Frame ${i + 1}: ${poseDetectionError}`);
           }
         } catch (error) {
-          console.error(`Error analyzing frame ${i + 1}:`, error);
+          poseDetectionError = `Pose detection failed: ${error.message}`;
+          console.error(`❌ Frame ${i + 1} pose detection error:`, error);
+        }
+        
+        // Always add frame data, regardless of pose detection success
+        const frameData: FramePoseAnalysis = {
+          frameNumber: frame.frameNumber,
+          timestamp: frame.timestamp,
+          imageData: frame.imageData, // Always include the frame image
+          poses: poseResult ? [poseResult] : [],
+          metrics: metrics || {
+            bodyRotation: 0,
+            centerOfGravity: { x: 0, y: 0 },
+            stanceWidth: 0,
+            kneeFlexion: 0
+          },
+          poseDetectionError: poseDetectionError || undefined
+        };
+        
+        frameAnalysisResults.push(frameData);
+        
+        if (poseDetectionError) {
+          console.log(`📋 Frame ${i + 1} added without pose data: ${poseDetectionError}`);
+        } else {
+          console.log(`✅ Frame ${i + 1} processed successfully with complete pose data`);
         }
       }
+      
+      console.log(`🎯 Frame analysis complete: ${frameAnalysisResults.length} frames total`);
+      console.log(`📈 Frames with poses: ${frameAnalysisResults.filter(f => f.poses.length > 0).length}`);
+      console.log(`⚠️ Frames without poses: ${frameAnalysisResults.filter(f => f.poses.length === 0).length}`);
 
       setFrameAnalysis(frameAnalysisResults);
       

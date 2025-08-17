@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, SkipBack, SkipForward, Eye } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Play, Pause, SkipBack, SkipForward, Eye, AlertTriangle } from 'lucide-react';
 
 interface PoseFrame {
   frameNumber: number;
@@ -18,6 +19,7 @@ interface PoseFrame {
     stanceWidth: number;
     kneeFlexion: number;
   };
+  poseDetectionError?: string; // Error message when pose detection fails
 }
 
 interface PoseVisualizationProps {
@@ -192,6 +194,16 @@ const PoseVisualization: React.FC<PoseVisualizationProps> = ({ frames, videoUrl 
               drawPoseKeypoints(currentFrame.poses[0].keypoints)
             )}
           </div>
+
+          {/* Pose Detection Error Alert */}
+          {currentFrame?.poseDetectionError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Pose Detection Failed:</strong> {currentFrame.poseDetectionError}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Controls */}
           <div className="flex items-center justify-center gap-2">
