@@ -417,12 +417,61 @@ serve(async (req) => {
     // Check if client provided frameAnalysis data
     if (frameAnalysis && frameAnalysis.length > 0) {
       console.log(`Using client-provided frame analysis data (${frameAnalysis.length} frames)`);
+      console.log('Sample frame data keys:', Object.keys(frameAnalysis[0] || {}));
       
       // Use the client-provided frame analysis directly
       analysisData = processClientFrameAnalysis(frameAnalysis, skillLevel || session.skill_level);
       
-      // Store the frameAnalysis data for visualization
-      analysisData.frameAnalysis = frameAnalysis;
+      // Store frame images in Supabase Storage and keep URLs in frameAnalysis
+      const frameAnalysisWithUrls = [];
+      
+      for (let i = 0; i < frameAnalysis.length; i++) {
+        const frame = frameAnalysis[i];
+        let frameImageUrl = null;
+        
+        if (frame.imageData) {
+          try {
+            // Convert base64 to blob
+            const base64Data = frame.imageData.split(',')[1];
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let j = 0; j < binaryString.length; j++) {
+              bytes[j] = binaryString.charCodeAt(j);
+            }
+            
+            // Upload to storage
+            const fileName = `${sessionId}/frame_${i}.jpg`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('surf-videos')
+              .upload(fileName, bytes, {
+                contentType: 'image/jpeg',
+                upsert: true
+              });
+              
+            if (!uploadError && uploadData) {
+              // Get public URL
+              const { data: urlData } = supabase.storage
+                .from('surf-videos')
+                .getPublicUrl(fileName);
+              frameImageUrl = urlData.publicUrl;
+              console.log(`Stored frame ${i} at:`, frameImageUrl);
+            } else {
+              console.error(`Failed to upload frame ${i}:`, uploadError);
+            }
+          } catch (error) {
+            console.error(`Error processing frame ${i}:`, error);
+          }
+        }
+        
+        frameAnalysisWithUrls.push({
+          ...frame,
+          imageData: frame.imageData, // Keep original for now
+          imageUrl: frameImageUrl // Add URL reference
+        });
+      }
+      
+      analysisData.frameAnalysis = frameAnalysisWithUrls;
+      console.log('Stored frameAnalysis with', analysisData.frameAnalysis.length, 'frames and URLs');
       
     } else if (useMockData) {
       console.log('Using MediaPipe pose analysis for surf video');
@@ -529,6 +578,10 @@ serve(async (req) => {
     }
 
     // Update the analysis session with results
+    console.log('Updating analysis session with results...');
+    console.log('Analysis data size:', JSON.stringify(analysisData).length, 'characters');
+    console.log('Has frameAnalysis:', !!analysisData.frameAnalysis, 'frames:', analysisData.frameAnalysis?.length);
+    
     const { error: updateError } = await supabase
       .from('analysis_sessions')
       .update({
@@ -543,8 +596,11 @@ serve(async (req) => {
 
     if (updateError) {
       console.error('Error updating session:', updateError);
+      console.error('Analysis data being saved:', JSON.stringify(analysisData, null, 2));
       throw new Error('Failed to save analysis results');
     }
+    
+    console.log('Successfully updated analysis session with frameAnalysis');
 
     return new Response(JSON.stringify({ 
       success: true, 
