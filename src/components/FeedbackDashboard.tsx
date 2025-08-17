@@ -56,6 +56,7 @@ const FeedbackDashboard = () => {
           processedFrames = analysisDataObj.frameAnalysis.map((frame: any, index: number) => ({
             frameNumber: index + 1,
             timestamp: frame.timestamp || (index * 0.5),
+            imageData: frame.imageData, // Include the actual frame image
             bodyRotation: frame.metrics?.bodyRotation || 0,
             stanceWidth: frame.metrics?.stanceWidth || 0.5,
             kneeFlexion: frame.metrics?.kneeFlexion || 45,

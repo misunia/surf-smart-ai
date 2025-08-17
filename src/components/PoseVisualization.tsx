@@ -7,6 +7,7 @@ import { Play, Pause, SkipBack, SkipForward, Eye } from 'lucide-react';
 interface PoseFrame {
   frameNumber: number;
   timestamp: number;
+  imageData?: string; // base64 frame image
   poses: Array<{
     keypoints: Array<{ x: number; y: number; confidence: number; name: string }>;
     confidence: number;
@@ -168,15 +169,23 @@ const PoseVisualization: React.FC<PoseVisualizationProps> = ({ frames, videoUrl 
         </CardHeader>
         <CardContent>
           <div className="relative aspect-video bg-muted rounded-lg overflow-hidden mb-4">
-            {/* Frame content placeholder - in real implementation this would show the actual frame */}
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-ocean">
-              <div className="text-center text-primary-foreground">
-                <p className="text-sm mb-2">Frame {currentFrameIndex + 1}</p>
-                <p className="text-xs opacity-75">
-                  Timestamp: {currentFrame?.timestamp?.toFixed(2)}s
-                </p>
+            {/* Real frame image or placeholder */}
+            {currentFrame?.imageData ? (
+              <img 
+                src={currentFrame.imageData} 
+                alt={`Frame ${currentFrameIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-ocean">
+                <div className="text-center text-primary-foreground">
+                  <p className="text-sm mb-2">Frame {currentFrameIndex + 1}</p>
+                  <p className="text-xs opacity-75">
+                    Timestamp: {currentFrame?.timestamp?.toFixed(2)}s
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
             
             {/* Pose overlay */}
             {showPoseOverlay && currentFrame?.poses?.[0]?.keypoints && (

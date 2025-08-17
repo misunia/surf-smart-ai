@@ -134,6 +134,7 @@ const VideoUpload = () => {
             frameAnalysisResults.push({
               frameNumber: frame.frameNumber,
               timestamp: frame.timestamp,
+              imageData: frame.imageData, // Include base64 frame image
               poses: [poseResult],
               metrics
             });

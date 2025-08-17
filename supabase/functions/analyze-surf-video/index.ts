@@ -526,7 +526,7 @@ serve(async (req) => {
         overall_score: analysisData.overallScore || analysisData.overall_score,
         analysis_data: analysisData,
         feedback_data: {
-          tips: feedback
+          tips: analysisData.recommendations || []
         }
       })
       .eq('id', sessionId);

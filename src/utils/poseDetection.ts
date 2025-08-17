@@ -16,6 +16,7 @@ export interface PoseResult {
 export interface FramePoseAnalysis {
   frameNumber: number;
   timestamp: number;
+  imageData?: string; // base64 frame image
   poses: PoseResult[];
   metrics: {
     bodyRotation: number;
