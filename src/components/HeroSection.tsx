@@ -1,10 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Play, Upload, BarChart3 } from "lucide-react";
 import heroImage from "@/assets/hero-surf-coach.jpg";
-
 const HeroSection = () => {
-  return (
-    <section className="min-h-screen flex items-center justify-center bg-gradient-ocean relative overflow-hidden">
+  return <section className="min-h-screen flex items-center justify-center bg-gradient-ocean relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute top-20 left-10 w-32 h-32 bg-primary-light rounded-full blur-3xl animate-float"></div>
@@ -35,10 +33,7 @@ const HeroSection = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
-              <Button variant="hero" size="lg" className="text-lg px-8">
-                <Upload className="mr-2 h-5 w-5" />
-                Upload Video
-              </Button>
+              
               <Button variant="coral" size="lg" className="text-lg px-8">
                 <Play className="mr-2 h-5 w-5" />
                 Watch Demo
@@ -65,11 +60,7 @@ const HeroSection = () => {
           {/* Right Column - Hero Image */}
           <div className="relative">
             <div className="relative overflow-hidden rounded-2xl shadow-depth">
-              <img 
-                src={heroImage} 
-                alt="SurfPilot AI analyzing surf technique with pose detection"
-                className="w-full h-auto transform hover:scale-105 transition-transform duration-700"
-              />
+              <img src={heroImage} alt="SurfPilot AI analyzing surf technique with pose detection" className="w-full h-auto transform hover:scale-105 transition-transform duration-700" />
               {/* Overlay UI Elements */}
               <div className="absolute top-4 right-4 bg-card/90 backdrop-blur-sm rounded-lg p-3 shadow-wave">
                 <div className="flex items-center gap-2">
@@ -88,8 +79,6 @@ const HeroSection = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default HeroSection;
