@@ -9,6 +9,7 @@ import SkillLevelSelector from "./SkillLevelSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { extractFramesFromVideo } from "@/utils/frameExtraction";
 import { poseDetector, calculateSurfMetrics, FramePoseAnalysis } from "@/utils/poseDetection";
+import PoseVisualization from "./PoseVisualization";
 
 const VideoUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -402,6 +403,13 @@ const VideoUpload = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Show extracted frames if analysis is complete */}
+        {frameAnalysis.length > 0 && (
+          <div className="mt-8">
+            <PoseVisualization frames={frameAnalysis} videoUrl={videoUrl} />
+          </div>
+        )}
       </div>
     </section>
   );
