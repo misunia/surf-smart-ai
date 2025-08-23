@@ -63,8 +63,8 @@ class MediaPipePoseDetector {
         smoothLandmarks: true,
         enableSegmentation: false,
         smoothSegmentation: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
+        minDetectionConfidence: 0.3,
+        minTrackingConfidence: 0.3
       });
 
       this.isInitialized = true;
