@@ -64,11 +64,13 @@ export const TestUpload = () => {
         });
       }
 
-      // Test 3: Storage Access (check bucket exists)
+      // Test 3: Storage Access (bucket via objects list)
       try {
-        const { data: buckets, error } = await supabase.storage.listBuckets();
+        const { data, error } = await supabase.storage
+          .from('surf-videos')
+          .list('', { limit: 1 });
         
-        if (!error && buckets?.some(bucket => bucket.name === 'surf-videos')) {
+        if (!error) {
           results.storage = true;
           toast({
             title: "✅ Storage Test Passed",
@@ -77,14 +79,14 @@ export const TestUpload = () => {
         } else {
           toast({
             title: "❌ Storage Test Failed",
-            description: "surf-videos bucket not found",
+            description: error.message || "Bucket not accessible",
             variant: "destructive"
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         toast({
           title: "❌ Storage Test Failed",
-          description: "Could not access storage",
+          description: error?.message || "Could not access storage",
           variant: "destructive"
         });
       }
