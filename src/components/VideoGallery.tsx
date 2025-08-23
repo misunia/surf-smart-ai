@@ -15,7 +15,7 @@ interface AnalysisSession {
   overall_score: number;
   status: string;
   created_at: string;
-  analysis_data: any;
+  analysis_data?: any;
 }
 
 export const VideoGallery = () => {
@@ -34,13 +34,18 @@ export const VideoGallery = () => {
     if (!user) return;
 
     try {
+      // Optimized query - only select necessary fields to avoid timeout
       const { data, error } = await supabase
         .from('analysis_sessions')
-        .select('*')
+        .select('id, video_url, skill_level, overall_score, status, created_at')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(20); // Limit to prevent large data loads
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       setSessions(data || []);
     } catch (error) {
