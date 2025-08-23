@@ -11,7 +11,8 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { extractFramesFromVideo } from '@/utils/frameExtraction';
 import { poseDetector, calculateSurfMetrics, type FramePoseAnalysis } from '@/utils/poseDetection';
-import { Play, Upload, Trash2, FileVideo, Link } from 'lucide-react';
+import { Play, Upload, Trash2, FileVideo, Link, Zap } from 'lucide-react';
+import { FrameAnalysisViewer } from './FrameAnalysisViewer';
 
 interface ReferenceVideo {
   id: string;
@@ -31,6 +32,7 @@ export const ReferenceLibrary = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedVideoForAnalysis, setSelectedVideoForAnalysis] = useState<ReferenceVideo | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     surfer_name: '',
@@ -629,12 +631,23 @@ export const ReferenceLibrary = () => {
                 </div>
               )}
               
-              <Button variant="outline" size="sm" className="w-full" asChild>
-                <a href={video.video_url} target="_blank" rel="noopener noreferrer">
-                  <Play className="h-4 w-4 mr-2" />
-                  Watch Video
-                </a>
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" asChild>
+                  <a href={video.video_url} target="_blank" rel="noopener noreferrer">
+                    <Play className="h-4 w-4 mr-2" />
+                    Watch
+                  </a>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => setSelectedVideoForAnalysis(video)}
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Analyze
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -648,6 +661,22 @@ export const ReferenceLibrary = () => {
             <p className="text-muted-foreground">Add professional bottom turn videos to build the training dataset.</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Frame Analysis Viewer */}
+      {selectedVideoForAnalysis && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setSelectedVideoForAnalysis(null)}
+            >
+              ← Back to Library
+            </Button>
+            <h3 className="text-lg font-semibold">Frame Analysis</h3>
+          </div>
+          <FrameAnalysisViewer video={selectedVideoForAnalysis} />
+        </div>
       )}
     </div>
   );
