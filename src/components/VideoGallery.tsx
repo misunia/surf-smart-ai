@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Play, Calendar, TrendingUp, User, Eye } from 'lucide-react';
+import { Play, Calendar, TrendingUp, User, Eye, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { VideoPlayer } from './VideoPlayer';
 
@@ -113,6 +113,47 @@ export const VideoGallery = () => {
     return 'text-red-600';
   };
 
+  const deleteSession = async (sessionId: string, videoUrl: string) => {
+    try {
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('analysis_sessions')
+        .delete()
+        .eq('id', sessionId);
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      // Delete video file from storage
+      if (videoUrl) {
+        const { error: storageError } = await supabase.storage
+          .from('surf-videos')
+          .remove([videoUrl]);
+
+        if (storageError) {
+          console.error('Error deleting video file:', storageError);
+          // Don't throw here - we still want to update the UI even if file deletion fails
+        }
+      }
+
+      // Update local state
+      setSessions(prevSessions => prevSessions.filter(s => s.id !== sessionId));
+      
+      toast({
+        title: "Video deleted",
+        description: "Your video and analysis have been successfully deleted"
+      });
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      toast({
+        title: "Error deleting video",
+        description: "Failed to delete the video. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -206,19 +247,20 @@ export const VideoGallery = () => {
                 </div>
               )}
 
-              {/* Action Button */}
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button 
-                    className="w-full" 
-                    variant={session.status === 'completed' ? 'default' : 'secondary'}
-                    disabled={session.status !== 'completed'}
-                    onClick={() => setSelectedSession(session)}
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    {session.status === 'completed' ? 'View Analysis' : 'Processing...'}
-                  </Button>
-                </DialogTrigger>
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button 
+                      className="w-full" 
+                      variant={session.status === 'completed' ? 'default' : 'secondary'}
+                      disabled={session.status !== 'completed'}
+                      onClick={() => setSelectedSession(session)}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      {session.status === 'completed' ? 'View Analysis' : 'Processing...'}
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Surf Analysis Results</DialogTitle>
@@ -272,7 +314,18 @@ export const VideoGallery = () => {
                     </div>
                   )}
                 </DialogContent>
-              </Dialog>
+                </Dialog>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full text-destructive hover:text-destructive"
+                  onClick={() => deleteSession(session.id, session.video_url)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Video
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
