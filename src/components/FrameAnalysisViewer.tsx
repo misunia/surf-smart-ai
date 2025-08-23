@@ -40,34 +40,44 @@ export const FrameAnalysisViewer = ({ video }: FrameAnalysisViewerProps) => {
   const identifyCriticalPhases = (frameAnalyses: FramePoseAnalysis[]): CriticalFrame[] => {
     const criticalFrames: CriticalFrame[] = [];
     
-    if (frameAnalyses.length === 0) return criticalFrames;
+    console.log('Frame analyses received:', frameAnalyses.length);
+    
+    if (frameAnalyses.length === 0) {
+      console.log('No frame analyses available');
+      return criticalFrames;
+    }
 
-    // Bottom turn phases based on body rotation and stance
+    // Bottom turn phases based on timeline progression
     const phases = [
-      { name: 'Approach', range: [0, 0.2], description: 'Approaching the wave face' },
-      { name: 'Setup', range: [0.2, 0.4], description: 'Setting up body position' },
-      { name: 'Compression', range: [0.4, 0.6], description: 'Compressing into the turn' },
-      { name: 'Drive', range: [0.6, 0.8], description: 'Driving through the bottom' },
-      { name: 'Exit', range: [0.8, 1.0], description: 'Exiting toward the lip' }
+      { name: 'Approach', range: [0, 0.25], description: 'Approaching the wave face' },
+      { name: 'Setup', range: [0.25, 0.45], description: 'Setting up body position' },
+      { name: 'Compression', range: [0.45, 0.65], description: 'Compressing into the turn' },
+      { name: 'Drive', range: [0.65, 0.85], description: 'Driving through the bottom' },
+      { name: 'Exit', range: [0.85, 1.0], description: 'Exiting toward the lip' }
     ];
 
-    phases.forEach((phase, index) => {
+    phases.forEach((phase, phaseIndex) => {
       const startIdx = Math.floor(phase.range[0] * frameAnalyses.length);
-      const endIdx = Math.floor(phase.range[1] * frameAnalyses.length);
+      const endIdx = Math.ceil(phase.range[1] * frameAnalyses.length);
       
-      // Find the frame with best metrics in this phase
-      let bestFrame = frameAnalyses[startIdx];
+      console.log(`Phase ${phase.name}: checking frames ${startIdx} to ${endIdx}`);
+      
+      // Find the best frame in this phase range
+      let bestFrame = null;
       let bestScore = 0;
       
       for (let i = startIdx; i < Math.min(endIdx, frameAnalyses.length); i++) {
         const frame = frameAnalyses[i];
-        if (frame.metrics) {
-          // Score based on pose confidence and metric quality
-          const score = (
-            (frame.poses[0]?.confidence || 0) * 0.5 +
-            (1 - Math.abs(frame.metrics.bodyRotation) / 180) * 0.3 +
-            (frame.metrics.kneeFlexion > 10 ? 0.2 : 0) // Reward proper knee bend
-          );
+        
+        if (frame && frame.poses && frame.poses.length > 0 && frame.metrics) {
+          // Simple scoring based on pose confidence and having valid metrics
+          const poseConfidence = frame.poses[0].confidence || 0;
+          const hasValidMetrics = frame.metrics.bodyRotation !== undefined && 
+                                  frame.metrics.kneeFlexion !== undefined;
+          
+          const score = poseConfidence * (hasValidMetrics ? 1 : 0.1) + 0.1; // Always give some score
+          
+          console.log(`Frame ${i}: confidence=${poseConfidence}, hasMetrics=${hasValidMetrics}, score=${score}`);
           
           if (score > bestScore) {
             bestScore = score;
@@ -76,19 +86,30 @@ export const FrameAnalysisViewer = ({ video }: FrameAnalysisViewerProps) => {
         }
       }
 
-      if (bestFrame && bestFrame.poses[0]) {
+      // If no frame with pose was found, just take the middle frame of the phase
+      if (!bestFrame && frameAnalyses.length > 0) {
+        const middleIdx = Math.floor((startIdx + endIdx) / 2);
+        bestFrame = frameAnalyses[Math.min(middleIdx, frameAnalyses.length - 1)];
+        bestScore = 0.1; // Low score but still include it
+        console.log(`No pose found for ${phase.name}, using middle frame ${middleIdx}`);
+      }
+
+      if (bestFrame) {
         criticalFrames.push({
           frameNumber: bestFrame.frameNumber,
           timestamp: bestFrame.timestamp,
           imageData: '', // Will be filled when extracting frames
           phase: phase.name,
           importance: bestScore,
-          metrics: bestFrame.metrics
+          metrics: bestFrame.metrics || { bodyRotation: 0, centerOfGravity: { x: 0, y: 0 }, stanceWidth: 0, kneeFlexion: 0 }
         });
+        
+        console.log(`Added critical frame for ${phase.name}: frame ${bestFrame.frameNumber}`);
       }
     });
 
-    return criticalFrames.sort((a, b) => b.importance - a.importance);
+    console.log(`Total critical frames identified: ${criticalFrames.length}`);
+    return criticalFrames.sort((a, b) => a.timestamp - b.timestamp); // Sort by timeline instead of importance
   };
 
   const extractCriticalFrames = async () => {
@@ -121,7 +142,9 @@ export const FrameAnalysisViewer = ({ video }: FrameAnalysisViewerProps) => {
         try {
           const poseResult = await poseDetector.detectPose(extractedFrames[i].canvas);
           
-          if (poseResult && poseResult.keypoints.length > 0) {
+          console.log(`Frame ${i}: pose detected =`, !!poseResult, 'keypoints =', poseResult?.keypoints?.length);
+          
+          if (poseResult && poseResult.keypoints && poseResult.keypoints.length > 0) {
             const metrics = calculateSurfMetrics(poseResult.keypoints);
             
             frameAnalyses.push({
@@ -130,9 +153,28 @@ export const FrameAnalysisViewer = ({ video }: FrameAnalysisViewerProps) => {
               poses: [poseResult],
               metrics
             });
+            
+            console.log(`Frame ${i} metrics:`, metrics);
+          } else {
+            // Still add frame but without pose data
+            frameAnalyses.push({
+              frameNumber: extractedFrames[i].frameNumber,
+              timestamp: extractedFrames[i].timestamp,
+              poses: [],
+              metrics: { bodyRotation: 0, centerOfGravity: { x: 0, y: 0 }, stanceWidth: 0, kneeFlexion: 0 }
+            });
+            
+            console.log(`Frame ${i}: No pose detected, added placeholder`);
           }
         } catch (error) {
           console.error(`Error analyzing frame ${i}:`, error);
+          // Add placeholder frame even on error
+          frameAnalyses.push({
+            frameNumber: extractedFrames[i].frameNumber,
+            timestamp: extractedFrames[i].timestamp,
+            poses: [],
+            metrics: { bodyRotation: 0, centerOfGravity: { x: 0, y: 0 }, stanceWidth: 0, kneeFlexion: 0 }
+          });
         }
         
         setProgress(70 + (i / extractedFrames.length) * 20);
