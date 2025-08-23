@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Play, Calendar, TrendingUp, User, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { VideoPlayer } from './VideoPlayer';
 
 interface AnalysisSession {
   id: string;
@@ -25,6 +26,7 @@ export const VideoGallery = () => {
   const [sessions, setSessions] = useState<AnalysisSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<AnalysisSession | null>(null);
+  const [videoSignedUrls, setVideoSignedUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user) {
@@ -59,6 +61,30 @@ export const VideoGallery = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getVideoSignedUrl = async (videoPath: string) => {
+    if (videoSignedUrls[videoPath]) {
+      return videoSignedUrls[videoPath];
+    }
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('surf-videos')
+        .createSignedUrl(videoPath, 3600); // 1 hour expiry
+
+      if (error) {
+        console.error('Error getting signed URL:', error);
+        return null;
+      }
+
+      const signedUrl = data.signedUrl;
+      setVideoSignedUrls(prev => ({ ...prev, [videoPath]: signedUrl }));
+      return signedUrl;
+    } catch (error) {
+      console.error('Error creating signed URL:', error);
+      return null;
     }
   };
 
@@ -156,12 +182,12 @@ export const VideoGallery = () => {
               {/* Video Preview */}
               {session.video_url && (
                 <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                  <video 
-                    src={session.video_url} 
+                  <VideoPlayer 
+                    videoPath={session.video_url}
                     className="w-full h-full object-cover"
                     preload="metadata"
                   />
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
                     <Play className="w-8 h-8 text-white" />
                   </div>
                 </div>
@@ -203,15 +229,15 @@ export const VideoGallery = () => {
                   
                   {session.video_url && (
                     <div className="space-y-4">
-                      {/* Video Player */}
-                      <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-                        <video 
-                          src={session.video_url} 
-                          className="w-full h-full object-cover"
-                          controls
-                          preload="metadata"
-                        />
-                      </div>
+                       {/* Video Player */}
+                       <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+                         <VideoPlayer 
+                           videoPath={session.video_url}
+                           className="w-full h-full object-cover"
+                           controls={true}
+                           preload="metadata"
+                         />
+                       </div>
                       
                       {/* Analysis Summary */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
