@@ -70,14 +70,38 @@ export const ReferenceLibrary = () => {
       video.src = videoUrl;
       
       await new Promise((resolve, reject) => {
-        video.onloadedmetadata = resolve;
-        video.onerror = reject;
+        video.onloadedmetadata = () => {
+          console.log('Video metadata loaded successfully');
+          resolve(null);
+        };
+        video.onerror = (error) => {
+          console.error('Video loading error:', error);
+          reject(new Error('Failed to load video. Please check the URL and CORS settings.'));
+        };
+        video.onabort = () => {
+          reject(new Error('Video loading was aborted'));
+        };
+        
+        // Add timeout
+        setTimeout(() => {
+          reject(new Error('Video loading timeout. Please try again.'));
+        }, 10000);
       });
 
       setUploadProgress(30);
 
       // Convert video to blob for frame extraction
-      const response = await fetch(videoUrl);
+      const response = await fetch(videoUrl, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'video/*'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
+      }
+      
       const blob = await response.blob();
       const file = new File([blob], 'reference-video.mp4', { type: 'video/mp4' });
 
@@ -155,7 +179,11 @@ export const ReferenceLibrary = () => {
 
     } catch (error) {
       console.error('Error processing video:', error);
-      throw error;
+      if (error instanceof Error) {
+        throw new Error(`Video processing failed: ${error.message}`);
+      } else {
+        throw new Error('Video processing failed: Unknown error occurred');
+      }
     }
   };
 
