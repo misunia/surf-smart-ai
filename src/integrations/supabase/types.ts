@@ -59,6 +59,102 @@ export type Database = {
         }
         Relationships: []
       }
+      reference_videos: {
+        Row: {
+          analysis_data: Json | null
+          created_at: string
+          frame_analysis: Json | null
+          id: string
+          is_training_data: boolean | null
+          notes: string | null
+          quality_score: number
+          skill_level: string
+          surfer_name: string
+          technique: string
+          title: string
+          updated_at: string
+          video_url: string
+          wave_type: string
+        }
+        Insert: {
+          analysis_data?: Json | null
+          created_at?: string
+          frame_analysis?: Json | null
+          id?: string
+          is_training_data?: boolean | null
+          notes?: string | null
+          quality_score: number
+          skill_level?: string
+          surfer_name: string
+          technique?: string
+          title: string
+          updated_at?: string
+          video_url: string
+          wave_type?: string
+        }
+        Update: {
+          analysis_data?: Json | null
+          created_at?: string
+          frame_analysis?: Json | null
+          id?: string
+          is_training_data?: boolean | null
+          notes?: string | null
+          quality_score?: number
+          skill_level?: string
+          surfer_name?: string
+          technique?: string
+          title?: string
+          updated_at?: string
+          video_url?: string
+          wave_type?: string
+        }
+        Relationships: []
+      }
+      technique_metrics: {
+        Row: {
+          acceptable_max: number
+          acceptable_min: number
+          created_at: string
+          excellent_max: number
+          excellent_min: number
+          good_max: number
+          good_min: number
+          id: string
+          metric_name: string
+          pro_average: number
+          pro_std_deviation: number
+          technique: string
+        }
+        Insert: {
+          acceptable_max: number
+          acceptable_min: number
+          created_at?: string
+          excellent_max: number
+          excellent_min: number
+          good_max: number
+          good_min: number
+          id?: string
+          metric_name: string
+          pro_average: number
+          pro_std_deviation: number
+          technique: string
+        }
+        Update: {
+          acceptable_max?: number
+          acceptable_min?: number
+          created_at?: string
+          excellent_max?: number
+          excellent_min?: number
+          good_max?: number
+          good_min?: number
+          id?: string
+          metric_name?: string
+          pro_average?: number
+          pro_std_deviation?: number
+          technique?: string
+        }
+        Relationships: []
+      }
       technique_standards: {
         Row: {
           acceptable_max: number | null
