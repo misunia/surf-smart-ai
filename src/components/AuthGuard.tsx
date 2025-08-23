@@ -12,8 +12,12 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Only redirect if we're sure there's no user AND we're not still loading
     if (!loading && !user) {
+      console.log('AuthGuard: Redirecting to /auth - no user found');
       navigate('/auth');
+    } else if (user) {
+      console.log('AuthGuard: User authenticated:', user.email);
     }
   }, [user, loading, navigate]);
 
