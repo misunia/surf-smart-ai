@@ -32,42 +32,72 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!mounted) return;
-        
-        console.log('Auth state changed:', event, session?.user?.email);
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-
-        // Create user profile if it's a new signup
-        if (event === 'SIGNED_IN' && session?.user) {
-          setTimeout(() => {
-            createUserProfile(session.user);
-          }, 0);
-        }
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    const handleAuthChange = (event: string, session: any) => {
       if (!mounted) return;
       
-      if (error) {
-        console.error('Error getting session:', error);
-      }
+      console.log('🔐 Auth state changed:', event, session?.user?.email);
       
-      console.log('Initial session check:', session?.user?.email);
+      // Clear any pending loading timeout
+      if (timeoutId) clearTimeout(timeoutId);
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-    });
+
+      // Create user profile if it's a new signup
+      if (event === 'SIGNED_IN' && session?.user) {
+        setTimeout(() => {
+          createUserProfile(session.user);
+        }, 0);
+      }
+    };
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+
+    // Get initial session with retry logic for rate limiting
+    const getInitialSession = async (retryCount = 0) => {
+      if (!mounted) return;
+      
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.error('❌ Error getting session:', error);
+          
+          // If rate limited, retry after delay
+          if (error.message?.includes('rate limit') && retryCount < 3) {
+            console.log(`⏰ Rate limited, retrying in ${(retryCount + 1) * 2} seconds...`);
+            timeoutId = setTimeout(() => {
+              getInitialSession(retryCount + 1);
+            }, (retryCount + 1) * 2000);
+            return;
+          }
+        }
+        
+        console.log('✅ Initial session check:', session?.user?.email || 'No session');
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+        
+      } catch (err) {
+        console.error('❌ Unexpected error getting session:', err);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Start initial session check
+    getInitialSession();
 
     return () => {
       mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);

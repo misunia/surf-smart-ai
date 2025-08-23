@@ -12,13 +12,18 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Only redirect if we're sure there's no user AND we're not still loading
-    if (!loading && !user) {
-      console.log('AuthGuard: Redirecting to /auth - no user found');
-      navigate('/auth');
-    } else if (user) {
-      console.log('AuthGuard: User authenticated:', user.email);
-    }
+    // Give more time for auth to initialize and handle rate limiting
+    const timeoutId = setTimeout(() => {
+      if (!loading && !user) {
+        console.log('🚪 AuthGuard: Redirecting to /auth - no user found after timeout');
+        navigate('/auth');
+      } else if (user) {
+        console.log('✅ AuthGuard: User authenticated:', user.email);
+      }
+    }, 1000); // Wait 1 second before redirecting
+
+    // Cleanup timeout if component unmounts or auth state changes
+    return () => clearTimeout(timeoutId);
   }, [user, loading, navigate]);
 
   if (loading) {
