@@ -1,4 +1,4 @@
-import { Pose, POSE_LANDMARKS } from '@mediapipe/pose';
+// MediaPipe Pose will be loaded dynamically
 
 export interface PoseKeypoint {
   x: number;
@@ -28,15 +28,19 @@ export interface FramePoseAnalysis {
 }
 
 class MediaPipePoseDetector {
-  private pose: Pose | null = null;
+  private pose: any = null;
   private isInitialized = false;
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
+      // Dynamic import of MediaPipe Pose
+      const mediapipeModule = await import('@mediapipe/pose');
+      const { Pose } = mediapipeModule;
+
       this.pose = new Pose({
-        locateFile: (file) => {
+        locateFile: (file: string) => {
           return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
         }
       });
