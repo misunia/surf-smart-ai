@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Loader2, Waves } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -12,15 +13,26 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Debounce the redirect to prevent issues during rapid auth state changes
-    const timeoutId = setTimeout(() => {
+    // Only redirect if we're absolutely sure there's no auth
+    const timeoutId = setTimeout(async () => {
       if (!loading && !user) {
-        console.log('🚪 AuthGuard: Redirecting to /auth - no user found after debounce');
+        // Double-check with Supabase directly before redirecting
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            console.log('✅ AuthGuard: Found session, not redirecting');
+            return;
+          }
+        } catch (error) {
+          console.error('❌ AuthGuard: Error checking session:', error);
+        }
+        
+        console.log('🚪 AuthGuard: No auth found, redirecting to /auth');
         navigate('/auth', { replace: true });
       } else if (user) {
         console.log('✅ AuthGuard: User authenticated:', user.email);
       }
-    }, 2000); // Increased to 2 seconds to handle token refresh loops
+    }, 5000); // 5 seconds - very conservative
 
     return () => clearTimeout(timeoutId);
   }, [user, loading, navigate]);
