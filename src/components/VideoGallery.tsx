@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Play, Calendar, TrendingUp, User } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Play, Calendar, TrendingUp, User, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AnalysisSession {
@@ -23,6 +24,7 @@ export const VideoGallery = () => {
   const { toast } = useToast();
   const [sessions, setSessions] = useState<AnalysisSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<AnalysisSession | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -179,13 +181,72 @@ export const VideoGallery = () => {
               )}
 
               {/* Action Button */}
-              <Button 
-                className="w-full" 
-                variant={session.status === 'completed' ? 'default' : 'secondary'}
-                disabled={session.status !== 'completed'}
-              >
-                {session.status === 'completed' ? 'View Analysis' : 'Processing...'}
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    className="w-full" 
+                    variant={session.status === 'completed' ? 'default' : 'secondary'}
+                    disabled={session.status !== 'completed'}
+                    onClick={() => setSelectedSession(session)}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    {session.status === 'completed' ? 'View Analysis' : 'Processing...'}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Surf Analysis Results</DialogTitle>
+                    <DialogDescription>
+                      Analysis for {session.skill_level} level • {formatDate(session.created_at)}
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  {session.video_url && (
+                    <div className="space-y-4">
+                      {/* Video Player */}
+                      <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+                        <video 
+                          src={session.video_url} 
+                          className="w-full h-full object-cover"
+                          controls
+                          preload="metadata"
+                        />
+                      </div>
+                      
+                      {/* Analysis Summary */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-lg">Overall Score</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-3xl font-bold">
+                              <span className={getScoreColor(session.overall_score || 0)}>
+                                {session.overall_score?.toFixed(1) || 'N/A'}%
+                              </span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-lg">Status</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Badge className={`${getStatusColor(session.status)} text-white`}>
+                              {session.status}
+                            </Badge>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      
+                      <div className="text-center text-muted-foreground">
+                        <p>Detailed analysis coming soon...</p>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         ))}
