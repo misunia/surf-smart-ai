@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { extractFramesFromVideo } from '@/utils/frameExtraction';
 import { poseDetector, calculateSurfMetrics, type FramePoseAnalysis } from '@/utils/poseDetection';
-import { Play, Upload, Trash2 } from 'lucide-react';
+import { Play, Upload, Trash2, FileVideo, Link } from 'lucide-react';
 
 interface ReferenceVideo {
   id: string;
@@ -28,6 +29,8 @@ export const ReferenceLibrary = () => {
   const [referenceVideos, setReferenceVideos] = useState<ReferenceVideo[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     surfer_name: '',
@@ -57,6 +60,146 @@ export const ReferenceLibrary = () => {
         description: "Failed to load reference videos",
         variant: "destructive"
       });
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('video/')) {
+        setSelectedFile(file);
+        setFormData({ ...formData, video_url: '' }); // Clear URL when file is selected
+      } else {
+        toast({
+          title: "Invalid file type",
+          description: "Please select a video file",
+          variant: "destructive"
+        });
+      }
+    }
+  }, [formData, toast]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('video/')) {
+      setSelectedFile(file);
+      setFormData({ ...formData, video_url: '' }); // Clear URL when file is selected
+    }
+  };
+
+  const uploadFileToStorage = async (file: File): Promise<string> => {
+    const fileName = `${Date.now()}-${file.name}`;
+    
+    const { data, error } = await supabase.storage
+      .from('reference-videos')
+      .upload(fileName, file);
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('reference-videos')
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  };
+
+  const processVideoFile = async (file: File): Promise<any> => {
+    setUploadProgress(10);
+    
+    try {
+      // Extract frames directly from file
+      const frames = await extractFramesFromVideo(file, 8);
+      setUploadProgress(50);
+
+      // Initialize pose detector
+      await poseDetector.initialize();
+      setUploadProgress(60);
+
+      // Analyze each frame
+      const frameAnalyses: FramePoseAnalysis[] = [];
+      const allMetrics = {
+        bodyRotation: [],
+        stanceWidth: [],
+        kneeFlexion: []
+      };
+
+      for (let i = 0; i < frames.length; i++) {
+        try {
+          const poseResult = await poseDetector.detectPose(frames[i].canvas);
+          
+          if (poseResult && poseResult.keypoints.length > 0) {
+            const metrics = calculateSurfMetrics(poseResult.keypoints);
+            
+            allMetrics.bodyRotation.push(metrics.bodyRotation);
+            allMetrics.stanceWidth.push(metrics.stanceWidth);
+            allMetrics.kneeFlexion.push(metrics.kneeFlexion);
+
+            frameAnalyses.push({
+              frameNumber: frames[i].frameNumber,
+              timestamp: frames[i].timestamp,
+              poses: [poseResult],
+              metrics
+            });
+          }
+        } catch (error) {
+          console.error(`Error analyzing frame ${i}:`, error);
+        }
+      }
+
+      setUploadProgress(90);
+
+      // Calculate aggregate statistics
+      const calculateStats = (values: number[]) => {
+        if (values.length === 0) return { avg: 0, std: 0, min: 0, max: 0 };
+        
+        const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+        const variance = values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length;
+        const std = Math.sqrt(variance);
+        
+        return {
+          avg,
+          std,
+          min: Math.min(...values),
+          max: Math.max(...values)
+        };
+      };
+
+      const analysisData = {
+        frameAnalyses,
+        aggregateMetrics: {
+          bodyRotation: calculateStats(allMetrics.bodyRotation),
+          stanceWidth: calculateStats(allMetrics.stanceWidth),
+          kneeFlexion: calculateStats(allMetrics.kneeFlexion)
+        },
+        totalFrames: frames.length,
+        successfulAnalyses: frameAnalyses.length
+      };
+
+      setUploadProgress(100);
+      return analysisData;
+
+    } catch (error) {
+      console.error('Error processing video file:', error);
+      if (error instanceof Error) {
+        throw new Error(`Video processing failed: ${error.message}`);
+      } else {
+        throw new Error('Video processing failed: Unknown error occurred');
+      }
     }
   };
 
@@ -193,11 +336,20 @@ export const ReferenceLibrary = () => {
     setUploadProgress(0);
 
     try {
-      // Validate URL
-      new URL(formData.video_url);
+      let videoUrl = formData.video_url;
+      let analysisData;
 
-      // Process video and extract metrics
-      const analysisData = await processVideoAndExtractMetrics(formData.video_url);
+      if (selectedFile) {
+        // Upload file to storage first
+        videoUrl = await uploadFileToStorage(selectedFile);
+        // Process the uploaded file directly
+        analysisData = await processVideoFile(selectedFile);
+      } else {
+        // Validate URL
+        new URL(formData.video_url);
+        // Process video from URL
+        analysisData = await processVideoAndExtractMetrics(formData.video_url);
+      }
 
       // Save to database
       const { error } = await supabase
@@ -205,7 +357,7 @@ export const ReferenceLibrary = () => {
         .insert({
           title: formData.title,
           surfer_name: formData.surfer_name,
-          video_url: formData.video_url,
+          video_url: videoUrl,
           wave_type: formData.wave_type,
           technique: 'bottom_turn',
           quality_score: formData.quality_score,
@@ -226,6 +378,7 @@ export const ReferenceLibrary = () => {
         wave_type: 'beach_break',
         quality_score: 9
       });
+      setSelectedFile(null);
 
       await loadReferenceVideos();
 
@@ -285,7 +438,8 @@ export const ReferenceLibrary = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Video metadata fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="title">Video Title</Label>
@@ -310,17 +464,83 @@ export const ReferenceLibrary = () => {
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="video_url">Video URL</Label>
-              <Input
-                id="video_url"
-                type="url"
-                value={formData.video_url}
-                onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                placeholder="https://example.com/video.mp4"
-                required
-              />
-            </div>
+            {/* Upload method tabs */}
+            <Tabs defaultValue="url" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="url" className="flex items-center gap-2">
+                  <Link className="h-4 w-4" />
+                  Video URL
+                </TabsTrigger>
+                <TabsTrigger value="file" className="flex items-center gap-2">
+                  <FileVideo className="h-4 w-4" />
+                  Upload File
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="url" className="space-y-2">
+                <Label htmlFor="video_url">Video URL</Label>
+                <Input
+                  id="video_url"
+                  type="url"
+                  value={formData.video_url}
+                  onChange={(e) => {
+                    setFormData({ ...formData, video_url: e.target.value });
+                    setSelectedFile(null); // Clear file when URL is entered
+                  }}
+                  placeholder="https://example.com/video.mp4"
+                  required={!selectedFile}
+                />
+              </TabsContent>
+              
+              <TabsContent value="file" className="space-y-2">
+                <Label>Upload Video File</Label>
+                <div
+                  className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    dragActive 
+                      ? 'border-primary bg-primary/10' 
+                      : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                  }`}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileSelect}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="space-y-2">
+                    <FileVideo className="h-8 w-8 mx-auto text-muted-foreground" />
+                    {selectedFile ? (
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm font-medium">Drop video file here or click to browse</p>
+                        <p className="text-xs text-muted-foreground">Supports MP4, MOV, AVI, and other video formats</p>
+                      </div>
+                    )}
+                  </div>
+                  {selectedFile && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setSelectedFile(null)}
+                    >
+                      Remove File
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -361,7 +581,11 @@ export const ReferenceLibrary = () => {
               </div>
             )}
 
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button 
+              type="submit" 
+              disabled={loading || (!formData.video_url && !selectedFile)} 
+              className="w-full"
+            >
               {loading ? 'Analyzing Video...' : 'Add Reference Video'}
             </Button>
           </form>
