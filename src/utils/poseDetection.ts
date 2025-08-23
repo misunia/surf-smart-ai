@@ -1,4 +1,9 @@
-// MediaPipe Pose will be loaded dynamically
+// MediaPipe Pose will be loaded via CDN script
+declare global {
+  interface Window {
+    Pose: any;
+  }
+}
 
 export interface PoseKeypoint {
   x: number;
@@ -35,11 +40,19 @@ class MediaPipePoseDetector {
     if (this.isInitialized) return;
 
     try {
-      // Dynamic import of MediaPipe Pose
-      const mediapipeModule = await import('@mediapipe/pose');
-      const { Pose } = mediapipeModule;
+      // Load MediaPipe via CDN if not already loaded
+      if (!window.Pose) {
+        await this.loadMediaPipeScript();
+      }
 
-      this.pose = new Pose({
+      // Wait a bit for the script to be available
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      if (!window.Pose) {
+        throw new Error('MediaPipe Pose failed to load from CDN');
+      }
+
+      this.pose = new window.Pose({
         locateFile: (file: string) => {
           return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
         }
@@ -59,6 +72,16 @@ class MediaPipePoseDetector {
       console.error('Failed to initialize MediaPipe Pose:', error);
       throw error;
     }
+  }
+
+  private async loadMediaPipeScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load MediaPipe script'));
+      document.head.appendChild(script);
+    });
   }
 
   async detectPose(canvas: HTMLCanvasElement): Promise<PoseResult | null> {
