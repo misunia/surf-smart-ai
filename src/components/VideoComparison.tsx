@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { extractFramesFromVideo } from '@/utils/frameExtraction';
-import { Upload, Play, Pause, RotateCcw, Users, Camera } from 'lucide-react';
+import { poseDetector } from '@/utils/poseDetection';
+import { DetailedAnalysis } from './DetailedAnalysis';
+import { Upload, Play, Pause, RotateCcw, Users, Camera, BarChart3 } from 'lucide-react';
 
 interface ReferenceVideo {
   id: string;
@@ -20,6 +22,13 @@ interface VideoFrame {
   timestamp: number;
   imageData: string;
   phase: string;
+  poseMetrics?: {
+    bodyRotation: number;
+    centerOfGravity: { x: number; y: number };
+    stanceWidth: number;
+    kneeFlexion: number;
+    confidence: number;
+  };
 }
 
 interface VideoComparisonProps {
@@ -34,6 +43,7 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
   const [progress, setProgress] = useState(0);
   const [currentPhase, setCurrentPhase] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -49,31 +59,61 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
     const numFrames = 10; // Extract 10 frames for 5 phases (2 per phase)
     const extractedFrames = await extractFramesFromVideo(videoFile, numFrames);
     
+    // Initialize pose detector
+    await poseDetector.initialize();
+    
     const matchedFrames: VideoFrame[] = [];
     
-    phases.forEach((phase, index) => {
-      // Take 2 frames per phase
-      const frameIndex1 = index * 2;
-      const frameIndex2 = index * 2 + 1;
+    for (let phaseIndex = 0; phaseIndex < phases.length; phaseIndex++) {
+      const phase = phases[phaseIndex];
+      const frameIndex1 = phaseIndex * 2;
+      const frameIndex2 = phaseIndex * 2 + 1;
       
-      if (extractedFrames[frameIndex1]) {
-        matchedFrames.push({
-          frameNumber: extractedFrames[frameIndex1].frameNumber,
-          timestamp: extractedFrames[frameIndex1].timestamp,
-          imageData: extractedFrames[frameIndex1].imageData,
-          phase: phase.name
-        });
+      for (const frameIndex of [frameIndex1, frameIndex2]) {
+        if (extractedFrames[frameIndex]) {
+          // Analyze pose for this frame
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const img = new Image();
+          
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            img.src = extractedFrames[frameIndex].imageData;
+          });
+          
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx?.drawImage(img, 0, 0);
+          
+          const poseResult = await poseDetector.detectPose(canvas);
+          
+          let poseMetrics;
+          if (poseResult && poseResult.keypoints.length > 0) {
+            // Calculate pose metrics
+            const bodyRotation = Math.random() * 40 - 20; // Mock calculation
+            const centerOfGravity = { x: 0.5, y: 0.6 }; // Mock calculation
+            const stanceWidth = 0.3 + Math.random() * 0.4; // Mock calculation
+            const kneeFlexion = 20 + Math.random() * 40; // Mock calculation
+            
+            poseMetrics = {
+              bodyRotation,
+              centerOfGravity,
+              stanceWidth,
+              kneeFlexion,
+              confidence: poseResult.confidence
+            };
+          }
+          
+          matchedFrames.push({
+            frameNumber: extractedFrames[frameIndex].frameNumber,
+            timestamp: extractedFrames[frameIndex].timestamp,
+            imageData: extractedFrames[frameIndex].imageData,
+            phase: phase.name,
+            poseMetrics
+          });
+        }
       }
-      
-      if (extractedFrames[frameIndex2]) {
-        matchedFrames.push({
-          frameNumber: extractedFrames[frameIndex2].frameNumber,
-          timestamp: extractedFrames[frameIndex2].timestamp,
-          imageData: extractedFrames[frameIndex2].imageData,
-          phase: phase.name
-        });
-      }
-    });
+    }
     
     return matchedFrames;
   };
@@ -243,6 +283,13 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
                   <RotateCcw className="h-4 w-4" />
                   Reset
                 </Button>
+                <Button 
+                  onClick={() => setShowAnalysis(!showAnalysis)} 
+                  variant={showAnalysis ? "default" : "outline"}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  {showAnalysis ? 'Hide' : 'Show'} Analysis
+                </Button>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Phase:</span>
                   <Badge className={`${phases[currentPhase]?.color} text-white`}>
@@ -356,6 +403,16 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Detailed Analysis */}
+          {showAnalysis && (
+            <DetailedAnalysis 
+              referenceFrames={referenceFrames}
+              userFrames={userFrames}
+              currentPhase={currentPhase}
+              phases={phases}
+            />
+          )}
         </div>
       )}
     </div>
