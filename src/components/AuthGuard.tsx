@@ -12,17 +12,16 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Give more time for auth to initialize and handle rate limiting
+    // Debounce the redirect to prevent issues during rapid auth state changes
     const timeoutId = setTimeout(() => {
       if (!loading && !user) {
-        console.log('🚪 AuthGuard: Redirecting to /auth - no user found after timeout');
-        navigate('/auth');
+        console.log('🚪 AuthGuard: Redirecting to /auth - no user found after debounce');
+        navigate('/auth', { replace: true });
       } else if (user) {
         console.log('✅ AuthGuard: User authenticated:', user.email);
       }
-    }, 1000); // Wait 1 second before redirecting
+    }, 2000); // Increased to 2 seconds to handle token refresh loops
 
-    // Cleanup timeout if component unmounts or auth state changes
     return () => clearTimeout(timeoutId);
   }, [user, loading, navigate]);
 
