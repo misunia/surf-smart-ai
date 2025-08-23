@@ -11,8 +11,9 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { extractFramesFromVideo } from '@/utils/frameExtraction';
 import { poseDetector, calculateSurfMetrics, type FramePoseAnalysis } from '@/utils/poseDetection';
-import { Play, Upload, Trash2, FileVideo, Link, Zap } from 'lucide-react';
+import { Play, Upload, Trash2, FileVideo, Link, Zap, Users } from 'lucide-react';
 import { FrameAnalysisViewer } from './FrameAnalysisViewer';
+import { VideoComparison } from './VideoComparison';
 
 interface ReferenceVideo {
   id: string;
@@ -33,6 +34,7 @@ export const ReferenceLibrary = () => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedVideoForAnalysis, setSelectedVideoForAnalysis] = useState<ReferenceVideo | null>(null);
+  const [selectedVideoForComparison, setSelectedVideoForComparison] = useState<ReferenceVideo | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     surfer_name: '',
@@ -631,22 +633,33 @@ export const ReferenceLibrary = () => {
                 </div>
               )}
               
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" asChild>
+              <div className="space-y-2">
+                <Button variant="outline" size="sm" className="w-full" asChild>
                   <a href={video.video_url} target="_blank" rel="noopener noreferrer">
                     <Play className="h-4 w-4 mr-2" />
                     Watch
                   </a>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1"
-                  onClick={() => setSelectedVideoForAnalysis(video)}
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Analyze
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => setSelectedVideoForAnalysis(video)}
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Analyze
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => setSelectedVideoForComparison(video)}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Compare
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -676,6 +689,22 @@ export const ReferenceLibrary = () => {
             <h3 className="text-lg font-semibold">Frame Analysis</h3>
           </div>
           <FrameAnalysisViewer video={selectedVideoForAnalysis} />
+        </div>
+      )}
+
+      {/* Video Comparison */}
+      {selectedVideoForComparison && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setSelectedVideoForComparison(null)}
+            >
+              ← Back to Library
+            </Button>
+            <h3 className="text-lg font-semibold">Video Comparison</h3>
+          </div>
+          <VideoComparison referenceVideo={selectedVideoForComparison} />
         </div>
       )}
     </div>
