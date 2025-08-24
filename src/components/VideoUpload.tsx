@@ -92,68 +92,6 @@ const VideoUpload = () => {
     ];
   };
 
-  // Helper function to generate mock pose keypoints for testing
-  const generateMockPoseKeypoints = (frameIndex: number): PoseKeypoint[] => {
-    // Generate realistic surf pose progression that simulates a bottom turn
-    const totalFrames = 10;
-    const progress = frameIndex / totalFrames; // 0 to 1
-    
-    // Simulate bottom turn progression: approach -> compression -> drive -> exit
-    let kneeFlexion, torsoLean, rotation;
-    
-    if (progress < 0.3) {
-      // Approach phase - neutral stance
-      kneeFlexion = 160 + Math.sin(progress * Math.PI) * 10; // 150-170 degrees
-      torsoLean = 5 + Math.random() * 5; // Slight lean
-      rotation = 5 + Math.random() * 5; // Minimal rotation
-    } else if (progress < 0.7) {
-      // Compression phase - deep compression, lean, rotation
-      const compressionProgress = (progress - 0.3) / 0.4;
-      kneeFlexion = 160 - compressionProgress * 75; // 160 -> 85 degrees (deep compression)
-      torsoLean = 5 + compressionProgress * 25; // 5 -> 30 degrees (lean into turn)
-      rotation = 5 + compressionProgress * 20; // 5 -> 25 degrees (shoulders lead)
-    } else {
-      // Extension/exit phase - extending out of turn
-      const exitProgress = (progress - 0.7) / 0.3;
-      kneeFlexion = 85 + exitProgress * 60; // 85 -> 145 degrees (extending)
-      torsoLean = 30 - exitProgress * 20; // 30 -> 10 degrees (straightening up)
-      rotation = 25 - exitProgress * 15; // 25 -> 10 degrees (reducing rotation)
-    }
-    
-    // Add some natural variation
-    kneeFlexion += (Math.random() - 0.5) * 5;
-    torsoLean += (Math.random() - 0.5) * 3;
-    rotation += (Math.random() - 0.5) * 3;
-    
-    // Calculate positions based on angles
-    const hipY = 50;
-    const kneeY = 70;
-    const ankleY = 90;
-    const shoulderY = 30;
-    
-    // Simulate stance width variation during turn
-    const stanceWidth = 0.3 + progress * 0.2; // Wider stance during compression
-    const centerX = 50;
-    
-    return [
-      // Shoulders - affected by torso lean
-      { x: centerX - 15 - torsoLean * 0.3, y: shoulderY, confidence: 0.9, name: 'left_shoulder' },
-      { x: centerX + 15 + torsoLean * 0.3, y: shoulderY, confidence: 0.9, name: 'right_shoulder' },
-      
-      // Hips - center of rotation
-      { x: centerX - 10, y: hipY, confidence: 0.8, name: 'left_hip' },
-      { x: centerX + 10, y: hipY, confidence: 0.8, name: 'right_hip' },
-      
-      // Knees - affected by compression and stance width
-      { x: centerX - 10 - stanceWidth * 20, y: kneeY, confidence: 0.7, name: 'left_knee' },
-      { x: centerX + 10 + stanceWidth * 20, y: kneeY, confidence: 0.7, name: 'right_knee' },
-      
-      // Ankles - follow knee positioning
-      { x: centerX - 12 - stanceWidth * 25, y: ankleY, confidence: 0.6, name: 'left_ankle' },
-      { x: centerX + 12 + stanceWidth * 25, y: ankleY, confidence: 0.6, name: 'right_ankle' }
-    ];
-  };
-
   const handleFileSelect = useCallback((file: File) => {
     if (file.type.startsWith('video/')) {
       setVideoFile(file);
