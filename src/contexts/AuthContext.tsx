@@ -49,8 +49,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       // Create user profile if it's a new signup
       if (event === 'SIGNED_IN' && session?.user) {
+        // Only create profile for new users, not existing ones
         setTimeout(() => {
-          createUserProfile(session.user);
+          createUserProfileIfNotExists(session.user);
         }, 0);
       }
     };
@@ -103,8 +104,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
   }, []);
 
-  const createUserProfile = async (user: User) => {
+  const createUserProfileIfNotExists = async (user: User) => {
     try {
+      // First check if profile already exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        // PGRST116 is "not found" error, which is expected for new users
+        console.error('Error checking existing profile:', checkError);
+        return;
+      }
+      
+      if (existingProfile) {
+        console.log('✅ User profile already exists, skipping creation');
+        return;
+      }
+      
+      // Create new profile only if it doesn't exist
+      console.log('🆕 Creating new user profile for:', user.email);
       const { error } = await supabase
         .from('user_profiles')
         .insert({
@@ -112,11 +133,53 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           skill_level: 'beginner'
         });
       
-      if (error && error.code !== '23505') { // Ignore unique constraint errors
-        console.error('Error creating user profile:', error);
+      if (error) {
+        if (error.code === '23505') {
+          console.log('✅ Profile already exists (race condition), ignoring duplicate error');
+        } else {
+          console.error('❌ Error creating user profile:', error);
+        }
+      } else {
+        console.log('✅ User profile created successfully');
       }
     } catch (error) {
-      console.error('Error creating user profile:', error);
+      console.error('❌ Unexpected error in createUserProfileIfNotExists:', error);
+    }
+  };
+
+  // Keep the old function name for backward compatibility but make it safe
+  const createUserProfile = async (user: User) => {
+    try {
+      // Check if profile exists first
+      const { data: existingProfile } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (existingProfile) {
+        console.log('✅ User profile already exists');
+        return;
+      }
+      
+      // Create profile with upsert to handle race conditions
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: user.id,
+          skill_level: 'beginner'
+        }, {
+          onConflict: 'user_id',
+          ignoreDuplicates: true
+        });
+      
+      if (error) {
+        console.error('Error creating user profile:', error);
+      } else {
+        console.log('✅ User profile created/updated successfully');
+      }
+    } catch (error) {
+      console.error('❌ Unexpected error creating user profile:', error);
     }
   };
 
