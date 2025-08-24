@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, TrendingDown, Target, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, AlertCircle, CheckCircle, XCircle, Award } from 'lucide-react';
+import { TurnResult } from '@/utils/TurnAnalyzer';
 
 interface VideoFrame {
   frameNumber: number;
@@ -25,6 +26,7 @@ interface DetailedAnalysisProps {
   userFrames: VideoFrame[];
   currentPhase: number;
   phases: Array<{ name: string; color: string; description: string }>;
+  turnResults?: TurnResult[];
 }
 
 interface PhaseAnalysis {
@@ -40,7 +42,7 @@ interface PhaseAnalysis {
   };
 }
 
-export const DetailedAnalysis = ({ referenceFrames, userFrames, currentPhase, phases }: DetailedAnalysisProps) => {
+export const DetailedAnalysis = ({ referenceFrames, userFrames, currentPhase, phases, turnResults = [] }: DetailedAnalysisProps) => {
   const [selectedTab, setSelectedTab] = useState('overview');
 
   console.log('DetailedAnalysis - referenceFrames:', referenceFrames);
@@ -385,6 +387,67 @@ export const DetailedAnalysis = ({ referenceFrames, userFrames, currentPhase, ph
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Turn Analysis Section */}
+      {turnResults && turnResults.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5" />
+              Turn Analysis ({turnResults.length} turns detected)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {turnResults.map((turn, index) => (
+                <Card key={index} className="border-2">
+                  <CardContent className="p-4">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Award className="h-4 w-4" />
+                      Turn {index + 1}
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                        <span className="text-sm font-medium">Bottom Turn:</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-bold ${getScoreColor((turn.bottom_turn.score / 10) * 100)}`}>
+                            {turn.bottom_turn.score}/10
+                          </span>
+                          {getScoreIcon((turn.bottom_turn.score / 10) * 100)}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                        <span className="text-sm font-medium">Top Turn:</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-bold ${getScoreColor((turn.top_turn.score / 10) * 100)}`}>
+                            {turn.top_turn.score}/10
+                          </span>
+                          {getScoreIcon((turn.top_turn.score / 10) * 100)}
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-semibold">Total Turn Score:</span>
+                          <span className={`text-lg font-bold ${getScoreColor(((turn.bottom_turn.score + turn.top_turn.score) / 20) * 100)}`}>
+                            {turn.bottom_turn.score + turn.top_turn.score}/20
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Turn Details */}
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div>Compression: {turn.bottom_turn.snapshot.knee.toFixed(1)}°</div>
+                        <div>Torso Lean: {turn.bottom_turn.snapshot.torso.toFixed(1)}°</div>
+                        <div>Rotation: {turn.bottom_turn.snapshot.rot.toFixed(1)}°</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Phase Scores Grid */}
       <Card>

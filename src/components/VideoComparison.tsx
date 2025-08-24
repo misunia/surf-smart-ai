@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { extractFramesFromVideo } from '@/utils/frameExtraction';
 import { poseDetector } from '@/utils/poseDetection';
 import { DetailedAnalysis } from './DetailedAnalysis';
+import { turnAnalyzer, TurnResult } from '@/utils/TurnAnalyzer';
 import { Upload, Play, Pause, RotateCcw, Users, Camera, BarChart3 } from 'lucide-react';
 
 interface ReferenceVideo {
@@ -29,6 +30,7 @@ interface VideoFrame {
     kneeFlexion: number;
     confidence: number;
   };
+  turnResult?: TurnResult;
 }
 
 interface VideoComparisonProps {
@@ -44,6 +46,7 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
   const [currentPhase, setCurrentPhase] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [userTurnResults, setUserTurnResults] = useState<TurnResult[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -63,6 +66,11 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
     await poseDetector.initialize();
     
     const matchedFrames: VideoFrame[] = [];
+    
+    // Reset turn analyzer for each video processing
+    if (!isReference) {
+      turnAnalyzer.reset();
+    }
     
     for (let phaseIndex = 0; phaseIndex < phases.length; phaseIndex++) {
       const phase = phases[phaseIndex];
@@ -88,7 +96,14 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
           const poseResult = await poseDetector.detectPose(canvas);
           
           let poseMetrics;
+          let turnResult: TurnResult | null = null;
+          
           if (poseResult && poseResult.keypoints.length > 0) {
+            // Process through turn analyzer for user video
+            if (!isReference) {
+              turnResult = turnAnalyzer.processFrame(poseResult.keypoints);
+            }
+            
             // Calculate more realistic pose metrics based on phase
             const phaseModifiers = {
               'Approach': { rotationBase: -5, stanceBase: 0.35, kneeBase: 15 },
@@ -121,13 +136,19 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
             };
           }
           
-          matchedFrames.push({
+          const frameData: VideoFrame = {
             frameNumber: extractedFrames[frameIndex].frameNumber,
             timestamp: extractedFrames[frameIndex].timestamp,
             imageData: extractedFrames[frameIndex].imageData,
             phase: phase.name,
             poseMetrics
-          });
+          };
+          
+          if (turnResult) {
+            frameData.turnResult = turnResult;
+          }
+          
+          matchedFrames.push(frameData);
         }
       }
     }
@@ -159,11 +180,15 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
       const userFrames = await extractMatchingFrames(userVideo, false);
       setUserFrames(userFrames);
       
+      // Collect all turn results from user frames
+      const allTurnResults = turnAnalyzer.getTurnResults();
+      setUserTurnResults(allTurnResults);
+      
       setProgress(100);
       
       toast({
         title: "Comparison ready",
-        description: `Videos synchronized with ${phases.length} key phases`
+        description: `Videos synchronized with ${phases.length} key phases. ${allTurnResults.length} turns detected.`
       });
       
     } catch (error) {
@@ -423,11 +448,12 @@ export const VideoComparison = ({ referenceVideo }: VideoComparisonProps) => {
 
           {/* Detailed Analysis */}
           {showAnalysis && (
-            <DetailedAnalysis 
+            <DetailedAnalysis
               referenceFrames={referenceFrames}
               userFrames={userFrames}
               currentPhase={currentPhase}
               phases={phases}
+              turnResults={userTurnResults}
             />
           )}
         </div>
