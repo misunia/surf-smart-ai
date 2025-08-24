@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
@@ -143,7 +144,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         console.log('✅ User profile created successfully');
       }
     } catch (error) {
-      console.error('❌ Unexpected error in createUserProfileIfNotExists:', error);
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.error('❌ Network error in createUserProfileIfNotExists:', error);
+        toast({
+          title: "Network Error",
+          description: "Unable to connect to the server. Please check your internet connection or try again later.",
+          variant: "destructive",
+        });
+      } else {
+        console.error('❌ Unexpected error in createUserProfileIfNotExists:', error);
+      }
     }
   };
 
