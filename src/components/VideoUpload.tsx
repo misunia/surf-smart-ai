@@ -346,14 +346,56 @@ const VideoUpload = () => {
       }
 
       setAnalysisStep('Uploading video...');
-      // Upload video to storage
+      
+      // Upload video to storage with retry mechanism
       const fileName = `${user.id}/${session.id}-${videoFile.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('surf-videos')
-        .upload(fileName, videoFile);
-
+      let uploadData = null;
+      let uploadError = null;
+      const maxRetries = 3;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          setAnalysisStep(`Uploading video... (attempt ${attempt}/${maxRetries})`);
+          
+          const result = await supabase.storage
+            .from('surf-videos')
+            .upload(fileName, videoFile);
+          
+          uploadData = result.data;
+          uploadError = result.error;
+          
+          if (!uploadError) {
+            break; // Success, exit retry loop
+          }
+          
+          if (attempt < maxRetries) {
+            toast({
+              title: `Upload attempt ${attempt} failed`,
+              description: `Retrying in ${attempt * 2} seconds...`,
+              variant: "destructive"
+            });
+            
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          }
+        } catch (error: any) {
+          uploadError = { message: error.message || 'Network error during upload' };
+          
+          if (attempt < maxRetries) {
+            toast({
+              title: `Upload attempt ${attempt} failed`,
+              description: `Network error. Retrying in ${attempt * 2} seconds...`,
+              variant: "destructive"
+            });
+            
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          }
+        }
+      }
+      
       if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
+        throw new Error(`Upload failed after ${maxRetries} attempts: ${uploadError.message}`);
       }
 
       // Update session with video URL
