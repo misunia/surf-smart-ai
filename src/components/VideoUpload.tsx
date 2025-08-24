@@ -30,16 +30,63 @@ const VideoUpload = () => {
 
   // Helper function to generate mock pose keypoints for testing
   const generateMockPoseKeypoints = (frameIndex: number) => {
-    const variation = frameIndex * 0.1;
+    // Generate realistic surf pose progression that simulates a bottom turn
+    const totalFrames = 10;
+    const progress = frameIndex / totalFrames; // 0 to 1
+    
+    // Simulate bottom turn progression: approach -> compression -> drive -> exit
+    let kneeFlexion, torsoLean, rotation;
+    
+    if (progress < 0.3) {
+      // Approach phase - neutral stance
+      kneeFlexion = 160 + Math.sin(progress * Math.PI) * 10; // 150-170 degrees
+      torsoLean = 5 + Math.random() * 5; // Slight lean
+      rotation = 5 + Math.random() * 5; // Minimal rotation
+    } else if (progress < 0.7) {
+      // Compression phase - deep compression, lean, rotation
+      const compressionProgress = (progress - 0.3) / 0.4;
+      kneeFlexion = 160 - compressionProgress * 75; // 160 -> 85 degrees (deep compression)
+      torsoLean = 5 + compressionProgress * 25; // 5 -> 30 degrees (lean into turn)
+      rotation = 5 + compressionProgress * 20; // 5 -> 25 degrees (shoulders lead)
+    } else {
+      // Extension/exit phase - extending out of turn
+      const exitProgress = (progress - 0.7) / 0.3;
+      kneeFlexion = 85 + exitProgress * 60; // 85 -> 145 degrees (extending)
+      torsoLean = 30 - exitProgress * 20; // 30 -> 10 degrees (straightening up)
+      rotation = 25 - exitProgress * 15; // 25 -> 10 degrees (reducing rotation)
+    }
+    
+    // Add some natural variation
+    kneeFlexion += (Math.random() - 0.5) * 5;
+    torsoLean += (Math.random() - 0.5) * 3;
+    rotation += (Math.random() - 0.5) * 3;
+    
+    // Calculate positions based on angles
+    const hipY = 50;
+    const kneeY = 70;
+    const ankleY = 90;
+    const shoulderY = 30;
+    
+    // Simulate stance width variation during turn
+    const stanceWidth = 0.3 + progress * 0.2; // Wider stance during compression
+    const centerX = 50;
+    
     return [
-      { x: 30 + variation, y: 40, confidence: 0.9, name: 'left_shoulder' },
-      { x: 70 - variation, y: 40, confidence: 0.9, name: 'right_shoulder' },
-      { x: 35 + variation * 0.5, y: 70, confidence: 0.8, name: 'left_hip' },
-      { x: 65 - variation * 0.5, y: 70, confidence: 0.8, name: 'right_hip' },
-      { x: 30 + variation * 0.8, y: 85, confidence: 0.7, name: 'left_knee' },
-      { x: 70 - variation * 0.8, y: 85, confidence: 0.7, name: 'right_knee' },
-      { x: 28 + variation * 0.6, y: 95, confidence: 0.6, name: 'left_ankle' },
-      { x: 72 - variation * 0.6, y: 95, confidence: 0.6, name: 'right_ankle' }
+      // Shoulders - affected by torso lean
+      { x: centerX - 15 - torsoLean * 0.3, y: shoulderY, confidence: 0.9, name: 'left_shoulder' },
+      { x: centerX + 15 + torsoLean * 0.3, y: shoulderY, confidence: 0.9, name: 'right_shoulder' },
+      
+      // Hips - center of rotation
+      { x: centerX - 10, y: hipY, confidence: 0.8, name: 'left_hip' },
+      { x: centerX + 10, y: hipY, confidence: 0.8, name: 'right_hip' },
+      
+      // Knees - affected by compression and stance width
+      { x: centerX - 10 - stanceWidth * 20, y: kneeY, confidence: 0.7, name: 'left_knee' },
+      { x: centerX + 10 + stanceWidth * 20, y: kneeY, confidence: 0.7, name: 'right_knee' },
+      
+      // Ankles - follow knee positioning
+      { x: centerX - 12 - stanceWidth * 25, y: ankleY, confidence: 0.6, name: 'left_ankle' },
+      { x: centerX + 12 + stanceWidth * 25, y: ankleY, confidence: 0.6, name: 'right_ankle' }
     ];
   };
 
@@ -174,6 +221,7 @@ const VideoUpload = () => {
         let poseDetectionError = null;
         let poseResult = null;
         let metrics = null;
+        let turnResult: TurnResult | null = null;
         
         if (poseDetectorReady) {
           try {
@@ -188,10 +236,15 @@ const VideoUpload = () => {
             if (poseResult && poseResult.keypoints.length > 0) {
               metrics = calculateSurfMetrics(poseResult.keypoints);
               
-              // Process frame through turn analyzer
-              const turnResult = turnAnalyzer.processFrame(poseResult.keypoints);
+              // Process frame through turn analyzer with real pose data
+              turnResult = turnAnalyzer.processFrame(poseResult.keypoints);
               if (turnResult) {
                 detectedTurns.push(turnResult);
+                console.log(`🏄 Turn detected at frame ${i + 1}:`, {
+                  bottomScore: turnResult.bottom_turn.score,
+                  topScore: turnResult.top_turn.score,
+                  totalScore: turnResult.bottom_turn.score + turnResult.top_turn.score
+                });
               }
             } else {
               poseDetectionError = 'No human pose detected in frame';
@@ -205,10 +258,16 @@ const VideoUpload = () => {
           const mockKeypoints = this.generateMockPoseKeypoints(i);
           metrics = calculateSurfMetrics(mockKeypoints);
           
-          // Still process through turn analyzer with mock data
-          const turnResult = turnAnalyzer.processFrame(mockKeypoints);
+          // Process mock data through turn analyzer
+          turnResult = turnAnalyzer.processFrame(mockKeypoints);
           if (turnResult) {
             detectedTurns.push(turnResult);
+            console.log(`🏄 Mock turn detected at frame ${i + 1}:`, {
+              bottomScore: turnResult.bottom_turn.score,
+              topScore: turnResult.top_turn.score,
+              totalScore: turnResult.bottom_turn.score + turnResult.top_turn.score,
+              state: turnAnalyzer.getCurrentState()
+            });
           }
           
           poseDetectionError = 'Using simulated pose data (pose detector unavailable)';
@@ -229,6 +288,11 @@ const VideoUpload = () => {
           poseDetectionError: poseDetectionError || undefined
         };
         
+        // Add turn result to frame data if detected
+        if (turnResult) {
+          frameData.turnResult = turnResult;
+        }
+        
         frameAnalysisResults.push(frameData);
         
         // Update progress more frequently
@@ -242,6 +306,14 @@ const VideoUpload = () => {
       
       const framesWithPoses = frameAnalysisResults.filter(f => f.poses.length > 0).length;
       console.log(`🎯 Frame analysis complete: ${frameAnalysisResults.length} frames total, ${framesWithPoses} with poses, ${detectedTurns.length} turns detected`);
+      
+      // Log turn analyzer final state
+      console.log(`🏄 TurnAnalyzer final state: ${turnAnalyzer.getCurrentState()}`);
+      console.log(`🏄 All detected turns:`, detectedTurns.map(turn => ({
+        bottomScore: turn.bottom_turn.score,
+        topScore: turn.top_turn.score,
+        total: turn.bottom_turn.score + turn.top_turn.score
+      })));
 
       setFrameAnalysis(frameAnalysisResults);
       setTurnResults(detectedTurns);
@@ -555,8 +627,14 @@ const VideoUpload = () => {
                 <Card className="shadow-wave">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      🏄 Turn Analysis Results ({turnResults.length} turns detected)
+                      <div className="flex items-center gap-2">
+                        🏄 Turn Analysis Results 
+                        <Badge variant="secondary">{turnResults.length} turns detected</Badge>
+                      </div>
                     </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Current analyzer state: {turnAnalyzer.getCurrentState()}
+                    </p>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -591,7 +669,7 @@ const VideoUpload = () => {
                                 <div>Compression: {turn.bottom_turn.snapshot.knee.toFixed(1)}°</div>
                                 <div>Torso Lean: {turn.bottom_turn.snapshot.torso.toFixed(1)}°</div>
                                 <div>Rotation: {turn.bottom_turn.snapshot.rot.toFixed(1)}°</div>
-                                <div>State: {turnAnalyzer.getCurrentState()}</div>
+                                <div>Frames: BT({turn.bottom_turn.frames}) TT({turn.top_turn.frames})</div>
                               </div>
                             </div>
                           </CardContent>
@@ -601,9 +679,12 @@ const VideoUpload = () => {
                     
                     {turnResults.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
-                        <p>No complete turns detected in this video.</p>
+                        <p>No complete turns detected yet.</p>
                         <p className="text-sm mt-2">
                           Current state: {turnAnalyzer.getCurrentState()}
+                        </p>
+                        <p className="text-xs mt-1">
+                          The analyzer looks for: compression → lean → rotation → extension sequence
                         </p>
                       </div>
                     )}
