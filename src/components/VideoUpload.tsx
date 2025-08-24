@@ -225,8 +225,7 @@ const VideoUpload = () => {
         let metrics = null;
         let turnResult: TurnResult | null = null;
         
-        // Always use mock data for now since MediaPipe isn't working in this environment
-        if (false && poseDetectorReady) {
+        if (poseDetectorReady) {
           try {
             // Add timeout to pose detection to prevent hanging
             const poseDetectionPromise = poseDetector.detectPose(frame.canvas);
@@ -257,7 +256,7 @@ const VideoUpload = () => {
             console.warn(`⚠️ Frame ${i + 1} pose detection error:`, error.message);
           }
         } else {
-          // Use mock pose data (always for now)
+          // Generate mock pose data if pose detector isn't available
           const mockKeypoints = generateMockPoseKeypoints(i);
           metrics = calculateSurfMetrics(mockKeypoints);
           
@@ -273,8 +272,7 @@ const VideoUpload = () => {
             });
           }
           
-          // Don't show error for mock data - it's intentional
-          poseDetectionError = undefined;
+          poseDetectionError = 'Using simulated pose data (pose detector unavailable)';
         }
         
         // Always add frame data, regardless of pose detection success
