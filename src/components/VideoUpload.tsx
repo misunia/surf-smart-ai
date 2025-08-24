@@ -12,6 +12,7 @@ import { poseDetector, calculateSurfMetrics, FramePoseAnalysis } from "@/utils/p
 import { turnAnalyzer, TurnResult } from "@/utils/TurnAnalyzer";
 import PoseVisualization from "./PoseVisualization";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 const VideoUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -29,7 +30,7 @@ const VideoUpload = () => {
   const { toast } = useToast();
 
   // Helper function to generate mock pose keypoints for testing
-  const generateMockPoseKeypoints = (frameIndex: number) => {
+  const generateMockPoseKeypoints = (frameIndex: number): PoseKeypoint[] => {
     // Generate realistic surf pose progression that simulates a bottom turn
     const totalFrames = 10;
     const progress = frameIndex / totalFrames; // 0 to 1
@@ -259,7 +260,7 @@ const VideoUpload = () => {
           metrics = calculateSurfMetrics(mockKeypoints);
           
           // Process mock data through turn analyzer
-          turnResult = turnAnalyzer.processFrame(mockKeypoints);
+          turnResult = turnAnalyzer.processFrame(mockKeypoints as PoseKeypoint[]);
           if (turnResult) {
             detectedTurns.push(turnResult);
             console.log(`🏄 Mock turn detected at frame ${i + 1}:`, {
@@ -290,7 +291,7 @@ const VideoUpload = () => {
         
         // Add turn result to frame data if detected
         if (turnResult) {
-          frameData.turnResult = turnResult;
+          (frameData as any).turnResult = turnResult;
         }
         
         frameAnalysisResults.push(frameData);
@@ -619,79 +620,72 @@ const VideoUpload = () => {
         {/* Show extracted frames if analysis is complete */}
         {frameAnalysis.length > 0 && (
           <div className="mt-8">
-            <div className="space-y-6">
-              <PoseVisualization frames={frameAnalysis} videoUrl={videoUrl} />
-              
-              {/* Turn Analysis Results */}
-              {turnResults.length > 0 && (
-                <Card className="shadow-wave">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <div className="flex items-center gap-2">
-                        🏄 Turn Analysis Results 
-                        <Badge variant="secondary">{turnResults.length} turns detected</Badge>
-                      </div>
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Current analyzer state: {turnAnalyzer.getCurrentState()}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {turnResults.map((turn, index) => (
-                        <Card key={index} className="border-2">
-                          <CardContent className="p-4">
-                            <h4 className="font-medium mb-3">Turn {index + 1}</h4>
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
-                                <span className="text-sm font-medium">Bottom Turn:</span>
-                                <span className="font-bold text-blue-600">
-                                  {turn.bottom_turn.score}/10
+            <Card className="shadow-wave">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  🏄 Turn Analysis Results 
+                  <Badge variant="secondary">{turnResults.length} turns detected</Badge>
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Current analyzer state: {turnAnalyzer.getCurrentState()}
+                </p>
+              </CardHeader>
+              <CardContent>
+                {turnResults.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {turnResults.map((turn, index) => (
+                      <Card key={index} className="border-2">
+                        <CardContent className="p-4">
+                          <h4 className="font-medium mb-3">Turn {index + 1}</h4>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                              <span className="text-sm font-medium">Bottom Turn:</span>
+                              <span className="font-bold text-blue-600">
+                                {turn.bottom_turn.score}/10
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                              <span className="text-sm font-medium">Top Turn:</span>
+                              <span className="font-bold text-green-600">
+                                {turn.top_turn.score}/10
+                              </span>
+                            </div>
+                            <div className="pt-2 border-t border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold">Total Score:</span>
+                                <span className="text-lg font-bold text-primary">
+                                  {turn.bottom_turn.score + turn.top_turn.score}/20
                                 </span>
-                              </div>
-                              <div className="flex justify-between items-center p-2 bg-green-50 rounded">
-                                <span className="text-sm font-medium">Top Turn:</span>
-                                <span className="font-bold text-green-600">
-                                  {turn.top_turn.score}/10
-                                </span>
-                              </div>
-                              <div className="pt-2 border-t border-gray-200">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-sm font-semibold">Total Score:</span>
-                                  <span className="text-lg font-bold text-primary">
-                                    {turn.bottom_turn.score + turn.top_turn.score}/20
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              {/* Turn Details */}
-                              <div className="text-xs text-muted-foreground space-y-1">
-                                <div>Compression: {turn.bottom_turn.snapshot.knee.toFixed(1)}°</div>
-                                <div>Torso Lean: {turn.bottom_turn.snapshot.torso.toFixed(1)}°</div>
-                                <div>Rotation: {turn.bottom_turn.snapshot.rot.toFixed(1)}°</div>
-                                <div>Frames: BT({turn.bottom_turn.frames}) TT({turn.top_turn.frames})</div>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                    
-                    {turnResults.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <p>No complete turns detected yet.</p>
-                        <p className="text-sm mt-2">
-                          Current state: {turnAnalyzer.getCurrentState()}
-                        </p>
-                        <p className="text-xs mt-1">
-                          The analyzer looks for: compression → lean → rotation → extension sequence
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                            
+                            {/* Turn Details */}
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              <div>Compression: {turn.bottom_turn.snapshot.knee.toFixed(1)}°</div>
+                              <div>Torso Lean: {turn.bottom_turn.snapshot.torso.toFixed(1)}°</div>
+                              <div>Rotation: {turn.bottom_turn.snapshot.rot.toFixed(1)}°</div>
+                              <div>Frames: BT({turn.bottom_turn.frames}) TT({turn.top_turn.frames})</div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No complete turns detected yet.</p>
+                    <p className="text-sm mt-2">
+                      Current state: {turnAnalyzer.getCurrentState()}
+                    </p>
+                    <p className="text-xs mt-1">
+                      The analyzer looks for: compression → lean → rotation → extension sequence
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <PoseVisualization frames={frameAnalysis} videoUrl={videoUrl} />
           </div>
         )}
       </div>
