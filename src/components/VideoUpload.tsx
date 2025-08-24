@@ -262,7 +262,7 @@ const VideoUpload = () => {
           
           // Process mock data through turn analyzer
           turnResult = turnAnalyzer.processFrame(mockKeypoints);
-          turnResult = turnAnalyzer.processFrame(mockKeypoints);
+          if (turnResult) {
             detectedTurns.push(turnResult);
             console.log(`🏄 Mock turn detected at frame ${i + 1}:`, {
               bottomScore: turnResult.bottom_turn.score,
