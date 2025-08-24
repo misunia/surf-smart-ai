@@ -135,52 +135,40 @@ const VideoUpload = () => {
       
       console.log(`🎬 Starting frame analysis for ${frames.length} frames`);
       
-      for (let i = 0; i < frames.length; i++) {
+      for (let i = 0; i < Math.min(frames.length, 20); i++) { // Limit to 20 frames for faster processing
         const frame = frames[i];
         
         setAnalysisStep(`Analyzing frame ${i + 1}/${frames.length}...`);
-        toast({
-          title: `Analyzing frame ${i + 1}/${frames.length}...`,
-          description: "Running pose detection"
-        });
 
-        console.log(`🔍 Processing frame ${i + 1}/${frames.length}...`);
+        console.log(`🔍 Processing frame ${i + 1}/${Math.min(frames.length, 20)}...`);
         
         let poseDetectionError = null;
         let poseResult = null;
         let metrics = null;
         
         try {
-          console.log(`🤖 Attempting pose detection on frame ${i + 1}...`);
-          poseResult = await poseDetector.detectPose(frame.canvas);
+          // Add timeout to pose detection to prevent hanging
+          const poseDetectionPromise = poseDetector.detectPose(frame.canvas);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Pose detection timeout')), 5000)
+          );
+          
+          poseResult = await Promise.race([poseDetectionPromise, timeoutPromise]);
           
           if (poseResult && poseResult.keypoints.length > 0) {
-            console.log(`✅ Pose detected on frame ${i + 1} with ${poseResult.keypoints.length} keypoints`);
             metrics = calculateSurfMetrics(poseResult.keypoints);
             
             // Process frame through turn analyzer
             const turnResult = turnAnalyzer.processFrame(poseResult.keypoints);
             if (turnResult) {
               detectedTurns.push(turnResult);
-              console.log(`🏄 Turn detected on frame ${i + 1}:`, {
-                bottomScore: turnResult.bottom_turn.score,
-                topScore: turnResult.top_turn.score,
-                totalScore: turnResult.bottom_turn.score + turnResult.top_turn.score
-              });
             }
-            
-            console.log(`📊 Surf metrics calculated for frame ${i + 1}:`, {
-              bodyRotation: metrics.bodyRotation,
-              stanceWidth: metrics.stanceWidth,
-              kneeFlexion: metrics.kneeFlexion
-            });
           } else {
             poseDetectionError = 'No human pose detected in frame';
-            console.log(`⚠️ Frame ${i + 1}: ${poseDetectionError}`);
           }
-        } catch (error) {
+        } catch (error: any) {
           poseDetectionError = `Pose detection failed: ${error.message}`;
-          console.error(`❌ Frame ${i + 1} pose detection error:`, error);
+          console.warn(`⚠️ Frame ${i + 1} pose detection error:`, error.message);
         }
         
         // Always add frame data, regardless of pose detection success
@@ -200,17 +188,17 @@ const VideoUpload = () => {
         
         frameAnalysisResults.push(frameData);
         
-        if (poseDetectionError) {
-          console.log(`📋 Frame ${i + 1} added without pose data: ${poseDetectionError}`);
-        } else {
-          console.log(`✅ Frame ${i + 1} processed successfully with complete pose data`);
+        // Update progress more frequently
+        if (i % 5 === 0 || i === Math.min(frames.length, 20) - 1) {
+          toast({
+            title: `Processing frames... ${i + 1}/${Math.min(frames.length, 20)}`,
+            description: `${frameAnalysisResults.filter(f => f.poses.length > 0).length} poses detected so far`
+          });
         }
       }
       
-      console.log(`🎯 Frame analysis complete: ${frameAnalysisResults.length} frames total`);
-      console.log(`📈 Frames with poses: ${frameAnalysisResults.filter(f => f.poses.length > 0).length}`);
-      console.log(`⚠️ Frames without poses: ${frameAnalysisResults.filter(f => f.poses.length === 0).length}`);
-      console.log(`🏄 Total turns detected: ${detectedTurns.length}`);
+      const framesWithPoses = frameAnalysisResults.filter(f => f.poses.length > 0).length;
+      console.log(`🎯 Frame analysis complete: ${frameAnalysisResults.length} frames total, ${framesWithPoses} with poses, ${detectedTurns.length} turns detected`);
 
       setFrameAnalysis(frameAnalysisResults);
       setTurnResults(detectedTurns);
