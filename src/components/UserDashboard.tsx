@@ -5,38 +5,18 @@ import { TestUpload } from './TestUpload';
 import { ReferenceLibrary } from './ReferenceLibrary';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Grid, User } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 export const UserDashboard = () => {
-  const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('upload');
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
-      {/* User Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Surf Analysis Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back! Upload videos and track your surfing progress.
-          </p>
-        </div>
-        <Card className="w-fit">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4" />
-              <CardTitle className="text-sm">Account</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-sm text-muted-foreground mb-2">{user?.email}</p>
-            <Button variant="outline" size="sm" onClick={signOut}>
-              Sign Out
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Dashboard Header */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold mb-4">Surf Analysis Dashboard</h1>
+        <p className="text-xl text-muted-foreground">
+          Upload videos, track progress, and improve your surfing with AI
+        </p>
       </div>
 
       {/* Main Content Tabs */}

@@ -23,7 +23,12 @@ const Index = () => {
 
   // Show dashboard for authenticated users
   if (user) {
-    return <UserDashboard />;
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <UserDashboard />
+      </div>
+    );
   }
 
   // Show marketing page for non-authenticated users

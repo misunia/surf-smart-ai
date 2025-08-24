@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, Play, Scissors, CheckCircle } from "lucide-react";
+import { Upload, Play, Scissors, CheckCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import SkillLevelSelector from "./SkillLevelSelector";
@@ -10,11 +10,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { extractFramesFromVideo } from "@/utils/frameExtraction";
 import { poseDetector, calculateSurfMetrics, FramePoseAnalysis } from "@/utils/poseDetection";
 import PoseVisualization from "./PoseVisualization";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const VideoUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState<string>('');
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [skillLevel, setSkillLevel] = useState<'beginner' | 'intermediate' | 'advanced' | 'pro' | null>(null);
   const [showSkillSelector, setShowSkillSelector] = useState(false);
@@ -94,12 +98,16 @@ const VideoUpload = () => {
     }
 
     setIsAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysisComplete(false);
+    
     try {
       if (!user) {
         throw new Error('User not authenticated');
       }
 
       // Step 1: Extract frames client-side
+      setAnalysisStep('Extracting video frames...');
       toast({
         title: "Extracting frames...",
         description: "Processing your video frames"
@@ -108,6 +116,7 @@ const VideoUpload = () => {
       const frames = await extractFramesFromVideo(videoFile, 100);
       
       // Step 2: Initialize pose detection
+      setAnalysisStep('Initializing AI models...');
       toast({
         title: "Initializing AI analysis...",
         description: "Loading pose detection models"
@@ -122,6 +131,7 @@ const VideoUpload = () => {
       for (let i = 0; i < frames.length; i++) {
         const frame = frames[i];
         
+        setAnalysisStep(`Analyzing frame ${i + 1}/${frames.length}...`);
         toast({
           title: `Analyzing frame ${i + 1}/${frames.length}...`,
           description: "Running pose detection"
@@ -184,6 +194,7 @@ const VideoUpload = () => {
 
       setFrameAnalysis(frameAnalysisResults);
       
+      setAnalysisStep('Creating analysis session...');
       // Create analysis session in database
       const { data: session, error: sessionError } = await supabase
         .from('analysis_sessions')
@@ -201,6 +212,7 @@ const VideoUpload = () => {
         throw new Error('Failed to create analysis session');
       }
 
+      setAnalysisStep('Uploading video...');
       // Upload video to storage
       const fileName = `${user.id}/${session.id}-${videoFile.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -221,6 +233,7 @@ const VideoUpload = () => {
         throw new Error('Failed to update session');
       }
 
+      setAnalysisStep('Running AI analysis...');
       // Start AI analysis with pre-processed frame data
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-surf-video', {
         body: {
@@ -233,26 +246,31 @@ const VideoUpload = () => {
 
       if (analysisError) {
         console.error('Analysis error:', analysisError);
+        setAnalysisError(`Analysis failed: ${analysisError.message}`);
         toast({
-          title: "Analysis completed with warnings",
-          description: "Your video has been processed. Check results below.",
+          title: "Analysis failed",
+          description: analysisError.message || "Please try again",
+          variant: "destructive"
         });
       } else {
+        setAnalysisComplete(true);
+        setAnalysisStep('Analysis complete!');
         toast({
           title: "Analysis complete!",
           description: "Check your technique feedback below",
         });
       }
 
-      setIsAnalyzing(false);
     } catch (error) {
-      setIsAnalyzing(false);
       console.error('Analysis error:', error);
+      setAnalysisError(error instanceof Error ? error.message : 'Unknown error occurred');
       toast({
         title: "Analysis failed",
         description: error instanceof Error ? error.message : "Please try again",
         variant: "destructive"
       });
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -341,7 +359,7 @@ const VideoUpload = () => {
                          {isAnalyzing ? (
                            <>
                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
-                             Analyzing...
+                             {analysisStep || 'Analyzing...'}
                            </>
                          ) : (
                            <>
@@ -395,8 +413,8 @@ const VideoUpload = () => {
               ) : (
                 <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                   <div className="text-center text-muted-foreground">
-                    <Play className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Video preview will appear here</p>
+                    <p className="font-semibold">{analysisStep || 'AI Analysis in Progress'}</p>
+                    <p className="text-sm opacity-90">Please wait, this may take a few minutes...</p>
                   </div>
                 </div>
               )}
@@ -413,6 +431,57 @@ const VideoUpload = () => {
       </div>
     </section>
   );
+    {/* Analysis Status */}
+    {(isAnalyzing || analysisComplete || analysisError) && (
+      <div className="mt-8 max-w-4xl mx-auto">
+        <Card className="shadow-wave">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {isAnalyzing && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>}
+              {analysisComplete && <CheckCircle className="h-5 w-5 text-green-600" />}
+              {analysisError && <AlertCircle className="h-5 w-5 text-red-600" />}
+              Analysis Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isAnalyzing && (
+              <div className="space-y-4">
+                <p className="text-lg font-medium">{analysisStep}</p>
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    Your video is being processed with AI pose detection. This includes:
+                  </p>
+                  <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                    <li>• Extracting key frames from your video</li>
+                    <li>• Running pose detection on each frame</li>
+                    <li>• Calculating surf-specific metrics</li>
+                    <li>• Generating personalized feedback</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+            
+            {analysisComplete && (
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Analysis completed successfully! Your results are being saved and will appear in your video gallery.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {analysisError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {analysisError}
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    )}
 };
 
 export default VideoUpload;
