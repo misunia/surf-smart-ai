@@ -12,8 +12,53 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Simple redirect logic - only redirect if definitely not authenticated
-    if (!loading && !user) {
+    // Only redirect if we're sure the user is not authenticated
+    // Add a small delay to prevent premature redirects during auth state changes
+    const timeoutId = setTimeout(() => {
+      if (!loading && !user) {
+        console.log('🚪 AuthGuard: No auth found, redirecting to /auth');
+        navigate('/auth', { replace: true });
+      }
+    }, 100); // Small delay to prevent race conditions
+    
+    return () => clearTimeout(timeoutId);
+  }, [user, loading, navigate]);
+
+  // Don't redirect immediately, give auth time to settle
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-ocean">
+        <div className="text-center text-white">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Waves className="h-8 w-8 animate-bounce" />
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+          <p className="text-lg font-medium">Loading SurfCoach AI...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state briefly while auth settles
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-ocean">
+        <div className="text-center text-white">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Waves className="h-8 w-8 animate-bounce" />
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+          <p className="text-lg font-medium">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};
+
+export default AuthGuard;
+
       console.log('🚪 AuthGuard: No auth found, redirecting to /auth');
       navigate('/auth', { replace: true });
     } else if (user) {

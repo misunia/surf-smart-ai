@@ -372,12 +372,15 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log('🚀 Edge function called with method:', req.method);
+  console.log('📥 Request headers:', Object.fromEntries(req.headers.entries()));
+
   try {
     const requestBody = await req.json();
-    console.log('Request body keys:', Object.keys(requestBody));
-    console.log('frameAnalysis type:', typeof requestBody.frameAnalysis);
-    console.log('frameAnalysis length:', requestBody.frameAnalysis?.length);
-    console.log('frameAnalysis exists:', !!requestBody.frameAnalysis);
+    console.log('📋 Request body keys:', Object.keys(requestBody));
+    console.log('🎬 frameAnalysis type:', typeof requestBody.frameAnalysis);
+    console.log('🎬 frameAnalysis length:', requestBody.frameAnalysis?.length);
+    console.log('🎬 frameAnalysis exists:', !!requestBody.frameAnalysis);
     
     const { sessionId, videoPath, frameAnalysis, skillLevel } = requestBody;
     
@@ -385,17 +388,23 @@ serve(async (req) => {
       throw new Error('Session ID is required');
     }
 
+    console.log('🔑 Session ID:', sessionId);
+    console.log('📹 Video path:', videoPath);
+    console.log('🎯 Skill level:', skillLevel);
+
     const openAIKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIKey) {
-      throw new Error('OpenAI API key not configured');
-    }
+    console.log('🔐 OpenAI key configured:', !!openAIKey);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    console.log('🗄️ Supabase URL:', supabaseUrl);
+    console.log('🔑 Supabase key configured:', !!supabaseKey);
+    
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get the analysis session to understand user's skill level and technique
+    console.log('📊 Fetching analysis session...');
     const { data: session, error: sessionError } = await supabase
       .from('analysis_sessions')
       .select('*')
@@ -403,55 +412,64 @@ serve(async (req) => {
       .single();
 
     if (sessionError || !session) {
+      console.error('❌ Session fetch error:', sessionError);
       throw new Error('Analysis session not found');
     }
 
+    console.log('✅ Session found:', session.id, 'User:', session.user_id);
+
     // Get signed URL for the video
+    console.log('🔗 Getting signed URL for video...');
     const { data: signedUrlData } = await supabase.storage
       .from('surf-videos')
       .createSignedUrl(videoPath, 300); // 5 minutes
 
     if (!signedUrlData?.signedUrl) {
+      console.error('❌ Failed to get signed URL for video path:', videoPath);
       throw new Error('Failed to get video URL');
     }
+
+    console.log('✅ Signed URL obtained:', signedUrlData.signedUrl.substring(0, 50) + '...');
 
     // Use mock data for development
     const useMockData = true; // TODO: Make this configurable via environment variable
 
     let analysisData;
     
-    console.log('=== FRAME ANALYSIS DEBUG ===');
-    console.log('frameAnalysis exists:', !!frameAnalysis);
-    console.log('frameAnalysis type:', typeof frameAnalysis);
-    console.log('frameAnalysis length:', frameAnalysis?.length);
-    console.log('frameAnalysis is array:', Array.isArray(frameAnalysis));
+    console.log('🎬 === FRAME ANALYSIS DEBUG ===');
+    console.log('🎬 frameAnalysis exists:', !!frameAnalysis);
+    console.log('🎬 frameAnalysis type:', typeof frameAnalysis);
+    console.log('🎬 frameAnalysis length:', frameAnalysis?.length);
+    console.log('🎬 frameAnalysis is array:', Array.isArray(frameAnalysis));
     if (frameAnalysis && frameAnalysis.length > 0) {
-      console.log('First frame keys:', Object.keys(frameAnalysis[0] || {}));
-      console.log('First frame has imageData:', !!frameAnalysis[0]?.imageData);
+      console.log('🎬 First frame keys:', Object.keys(frameAnalysis[0] || {}));
+      console.log('🎬 First frame has imageData:', !!frameAnalysis[0]?.imageData);
+      console.log('🎬 First frame has metrics:', !!frameAnalysis[0]?.metrics);
+      console.log('🎬 First frame has poses:', !!frameAnalysis[0]?.poses);
     }
-    console.log('=== END DEBUG ===');
+    console.log('🎬 === END DEBUG ===');
 
     // Check if client provided frameAnalysis data
     if (frameAnalysis && Array.isArray(frameAnalysis) && frameAnalysis.length > 0) {
-      console.log(`✓ Using client-provided frame analysis data (${frameAnalysis.length} frames)`);
-      console.log('Sample frame data keys:', Object.keys(frameAnalysis[0] || {}));
+      console.log(`✅ Using client-provided frame analysis data (${frameAnalysis.length} frames)`);
+      console.log('📋 Sample frame data keys:', Object.keys(frameAnalysis[0] || {}));
       
       // Store frame images in Supabase Storage and keep URLs in frameAnalysis
-      console.log('Starting frame image upload process...');
+      console.log('📤 Starting frame image upload process...');
       const frameAnalysisWithUrls = [];
       
       for (let i = 0; i < frameAnalysis.length; i++) {
         const frame = frameAnalysis[i];
         let frameImageUrl = null;
         
-        console.log(`Processing frame ${i + 1}/${frameAnalysis.length}, has imageData:`, !!frame.imageData);
+        console.log(`📸 Processing frame ${i + 1}/${frameAnalysis.length}, has imageData:`, !!frame.imageData);
         
         if (frame.imageData) {
           try {
             // Convert base64 to blob
             const base64Data = frame.imageData.split(',')[1];
             if (!base64Data) {
-              console.error(`Frame ${i}: Invalid base64 data format`);
+              console.error(`❌ Frame ${i}: Invalid base64 data format`);
               continue;
             }
             
@@ -461,7 +479,7 @@ serve(async (req) => {
               bytes[j] = binaryString.charCodeAt(j);
             }
             
-            console.log(`Frame ${i}: Converted to ${bytes.length} bytes`);
+            console.log(`📊 Frame ${i}: Converted to ${bytes.length} bytes`);
             
             // Upload to storage
             const fileName = `${sessionId}/frame_${i}.jpg`;
@@ -478,15 +496,15 @@ serve(async (req) => {
                 .from('surf-videos')
                 .getPublicUrl(fileName);
               frameImageUrl = urlData.publicUrl;
-              console.log(`✓ Frame ${i} uploaded successfully:`, frameImageUrl);
+              console.log(`✅ Frame ${i} uploaded successfully:`, frameImageUrl);
             } else {
-              console.error(`✗ Frame ${i} upload failed:`, uploadError);
+              console.error(`❌ Frame ${i} upload failed:`, uploadError);
             }
           } catch (error) {
-            console.error(`✗ Error processing frame ${i}:`, error);
+            console.error(`❌ Error processing frame ${i}:`, error);
           }
         } else {
-          console.warn(`Frame ${i}: No imageData found`);
+          console.warn(`⚠️ Frame ${i}: No imageData found`);
         }
         
         frameAnalysisWithUrls.push({
@@ -496,18 +514,18 @@ serve(async (req) => {
         });
       }
       
-      console.log(`Frame upload complete. Processed ${frameAnalysisWithUrls.length} frames`);
+      console.log(`📤 Frame upload complete. Processed ${frameAnalysisWithUrls.length} frames`);
       
       // Process the client frame analysis to get metrics and scores
-      console.log('Processing client frame analysis for metrics...');
+      console.log('📊 Processing client frame analysis for metrics...');
       analysisData = await processClientFrameAnalysis(frameAnalysis, skillLevel || session.skill_level);
       
       // CRITICAL: Add the frameAnalysis data to the final result
       analysisData.frameAnalysis = frameAnalysisWithUrls;
-      console.log('✓ Added frameAnalysis to analysisData. Final frameAnalysis count:', analysisData.frameAnalysis.length);
+      console.log('✅ Added frameAnalysis to analysisData. Final frameAnalysis count:', analysisData.frameAnalysis.length);
       
     } else if (useMockData) {
-      console.log('Using MediaPipe pose analysis for surf video');
+      console.log('🤖 Using MediaPipe pose analysis for surf video');
       
       // Step 1: Extract frames from video
       const frames = await extractFrames(signedUrlData.signedUrl);
@@ -528,92 +546,14 @@ serve(async (req) => {
         "Practice maintaining center of gravity during turns"
       ];
     } else {
-      // Original OpenAI API code (commented out for development)
-      /*
-      const analysisPrompt = `
-      Analyze this surf video for technique assessment. Focus on:
-      
-      User Details:
-      - Skill Level: ${session.skill_level}
-      - Target Technique: ${session.technique}
-      - Wave Type: ${session.wave_type}
-      
-      Please evaluate:
-      1. Body position and stance
-      2. Board control and balance
-      3. Wave reading and positioning
-      4. Timing and flow
-      5. Overall technique execution
-      
-      Provide scores (0-100) for each area and specific feedback for improvement.
-      Format your response as JSON with this structure:
-      {
-        "overall_score": number,
-        "body_position": number,
-        "board_control": number,
-        "wave_reading": number,
-        "timing": number,
-        "feedback": "detailed feedback text",
-        "recommendations": ["improvement tip 1", "improvement tip 2", "improvement tip 3"]
-      }
-      `;
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: analysisPrompt },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: signedUrlData.signedUrl,
-                    detail: 'high'
-                  }
-                }
-              ]
-            }
-          ],
-          max_tokens: 1000,
-          temperature: 0.7
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('OpenAI API error:', errorData);
-        throw new Error(`OpenAI API error: ${response.status}`);
-      }
-
-      const aiResponse = await response.json();
-      const analysisText = aiResponse.choices[0]?.message?.content;
-
-      if (!analysisText) {
-        throw new Error('No analysis received from AI');
-      }
-
-      // Parse the JSON response from AI
-      try {
-        analysisData = JSON.parse(analysisText);
-      } catch (parseError) {
-        console.error('Failed to parse AI response:', analysisText);
-        throw new Error('Failed to parse AI response');
-      }
-      */
-      throw new Error('OpenAI API is disabled in development mode');
+      console.log('❌ No frame analysis provided and mock data disabled');
+      throw new Error('No frame analysis data provided');
     }
 
     // Update the analysis session with results
-    console.log('Updating analysis session with results...');
-    console.log('Analysis data size:', JSON.stringify(analysisData).length, 'characters');
-    console.log('Has frameAnalysis:', !!analysisData.frameAnalysis, 'frames:', analysisData.frameAnalysis?.length);
+    console.log('💾 Updating analysis session with results...');
+    console.log('📊 Analysis data size:', JSON.stringify(analysisData).length, 'characters');
+    console.log('🎬 Has frameAnalysis:', !!analysisData.frameAnalysis, 'frames:', analysisData.frameAnalysis?.length);
     
     const { error: updateError } = await supabase
       .from('analysis_sessions')
@@ -628,12 +568,12 @@ serve(async (req) => {
       .eq('id', sessionId);
 
     if (updateError) {
-      console.error('Error updating session:', updateError);
-      console.error('Analysis data being saved:', JSON.stringify(analysisData, null, 2));
+      console.error('❌ Error updating session:', updateError);
+      console.error('📊 Analysis data being saved:', JSON.stringify(analysisData, null, 2));
       throw new Error('Failed to save analysis results');
     }
     
-    console.log('Successfully updated analysis session with frameAnalysis');
+    console.log('✅ Successfully updated analysis session with frameAnalysis');
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -643,7 +583,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in analyze-surf-video function:', error);
+    console.error('❌ Error in analyze-surf-video function:', error);
     return new Response(JSON.stringify({ 
       error: error.message || 'Analysis failed' 
     }), {

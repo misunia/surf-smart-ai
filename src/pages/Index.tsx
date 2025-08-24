@@ -21,25 +21,20 @@ const Index = () => {
     );
   }
 
-  // Show dashboard for authenticated users
-  if (user) {
-    return (
-      <div className="min-h-screen">
-        <Header />
-        <UserDashboard />
-      </div>
-    );
-  }
-
-  // Show marketing page for non-authenticated users
   return (
     <div className="min-h-screen">
       <Header />
-      <HeroSection />
-      <FeatureSection />
-      <VideoUpload />
-      <FeedbackDashboard />
-      <ValidationSurvey />
+      {user ? (
+        <UserDashboard />
+      ) : (
+        <>
+          <HeroSection />
+          <FeatureSection />
+          <VideoUpload />
+          <FeedbackDashboard />
+          <ValidationSurvey />
+        </>
+      )}
     </div>
   );
 };

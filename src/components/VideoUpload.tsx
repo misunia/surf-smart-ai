@@ -235,6 +235,13 @@ const VideoUpload = () => {
 
       setAnalysisStep('Running AI analysis...');
       // Start AI analysis with pre-processed frame data
+      console.log('🚀 Invoking analyze-surf-video function...');
+      console.log('📊 Sending frame analysis data:', {
+        sessionId: session.id,
+        frameCount: frameAnalysisResults.length,
+        skillLevel
+      });
+      
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-surf-video', {
         body: {
           sessionId: session.id,
@@ -243,6 +250,8 @@ const VideoUpload = () => {
           skillLevel
         }
       });
+
+      console.log('📥 Analysis function response:', { analysisData, analysisError });
 
       if (analysisError) {
         console.error('Analysis error:', analysisError);
@@ -253,6 +262,7 @@ const VideoUpload = () => {
           variant: "destructive"
         });
       } else {
+        console.log('✅ Analysis completed successfully');
         setAnalysisComplete(true);
         setAnalysisStep('Analysis complete!');
         toast({
@@ -422,6 +432,57 @@ const VideoUpload = () => {
           </Card>
         </div>
 
+        {/* Analysis Status */}
+        {(isAnalyzing || analysisComplete || analysisError) && (
+          <div className="mt-8 max-w-4xl mx-auto">
+            <Card className="shadow-wave">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {isAnalyzing && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>}
+                  {analysisComplete && <CheckCircle className="h-5 w-5 text-green-600" />}
+                  {analysisError && <AlertCircle className="h-5 w-5 text-red-600" />}
+                  Analysis Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isAnalyzing && (
+                  <div className="space-y-4">
+                    <p className="text-lg font-medium">{analysisStep}</p>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <p className="text-sm text-muted-foreground">
+                        Your video is being processed with AI pose detection. This includes:
+                      </p>
+                      <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                        <li>• Extracting key frames from your video</li>
+                        <li>• Running pose detection on each frame</li>
+                        <li>• Calculating surf-specific metrics</li>
+                        <li>• Generating personalized feedback</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+                
+                {analysisComplete && (
+                  <Alert>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Analysis completed successfully! Your results are being saved and will appear in your video gallery.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {analysisError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {analysisError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
         {/* Show extracted frames if analysis is complete */}
         {frameAnalysis.length > 0 && (
           <div className="mt-8">
@@ -431,57 +492,6 @@ const VideoUpload = () => {
       </div>
     </section>
   );
-    {/* Analysis Status */}
-    {(isAnalyzing || analysisComplete || analysisError) && (
-      <div className="mt-8 max-w-4xl mx-auto">
-        <Card className="shadow-wave">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {isAnalyzing && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>}
-              {analysisComplete && <CheckCircle className="h-5 w-5 text-green-600" />}
-              {analysisError && <AlertCircle className="h-5 w-5 text-red-600" />}
-              Analysis Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isAnalyzing && (
-              <div className="space-y-4">
-                <p className="text-lg font-medium">{analysisStep}</p>
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Your video is being processed with AI pose detection. This includes:
-                  </p>
-                  <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-                    <li>• Extracting key frames from your video</li>
-                    <li>• Running pose detection on each frame</li>
-                    <li>• Calculating surf-specific metrics</li>
-                    <li>• Generating personalized feedback</li>
-                  </ul>
-                </div>
-              </div>
-            )}
-            
-            {analysisComplete && (
-              <Alert>
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Analysis completed successfully! Your results are being saved and will appear in your video gallery.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {analysisError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {analysisError}
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    )}
 };
 
 export default VideoUpload;

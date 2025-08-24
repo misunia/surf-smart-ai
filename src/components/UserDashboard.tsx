@@ -4,13 +4,13 @@ import { VideoGallery } from './VideoGallery';
 import { TestUpload } from './TestUpload';
 import { ReferenceLibrary } from './ReferenceLibrary';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Grid, User } from 'lucide-react';
+import { Upload, Grid, User, Database } from 'lucide-react';
 
 export const UserDashboard = () => {
   const [activeTab, setActiveTab] = useState('upload');
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="container mx-auto px-6 py-8 space-y-6">
       {/* Dashboard Header */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-4">Surf Analysis Dashboard</h1>
@@ -31,7 +31,7 @@ export const UserDashboard = () => {
             My Videos
           </TabsTrigger>
           <TabsTrigger value="references" className="flex items-center gap-2">
-            <Grid className="w-4 h-4" />
+            <Database className="w-4 h-4" />
             Pro References
           </TabsTrigger>
           <TabsTrigger value="test" className="flex items-center gap-2">
