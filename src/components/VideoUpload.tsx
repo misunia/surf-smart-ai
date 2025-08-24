@@ -9,6 +9,7 @@ import SkillLevelSelector from "./SkillLevelSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { extractFramesFromVideo } from "@/utils/frameExtraction";
 import { poseDetector, calculateSurfMetrics, FramePoseAnalysis } from "@/utils/poseDetection";
+import { turnAnalyzer, TurnResult } from "@/utils/TurnAnalyzer";
 import PoseVisualization from "./PoseVisualization";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -23,6 +24,7 @@ const VideoUpload = () => {
   const [skillLevel, setSkillLevel] = useState<'beginner' | 'intermediate' | 'advanced' | 'pro' | null>(null);
   const [showSkillSelector, setShowSkillSelector] = useState(false);
   const [frameAnalysis, setFrameAnalysis] = useState<FramePoseAnalysis[]>([]);
+  const [turnResults, setTurnResults] = useState<TurnResult[]>([]);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -126,6 +128,11 @@ const VideoUpload = () => {
 
       // Step 3: Analyze each frame
       const frameAnalysisResults: FramePoseAnalysis[] = [];
+      const detectedTurns: TurnResult[] = [];
+      
+      // Reset turn analyzer for new video
+      turnAnalyzer.reset();
+      
       console.log(`🎬 Starting frame analysis for ${frames.length} frames`);
       
       for (let i = 0; i < frames.length; i++) {
@@ -150,6 +157,18 @@ const VideoUpload = () => {
           if (poseResult && poseResult.keypoints.length > 0) {
             console.log(`✅ Pose detected on frame ${i + 1} with ${poseResult.keypoints.length} keypoints`);
             metrics = calculateSurfMetrics(poseResult.keypoints);
+            
+            // Process frame through turn analyzer
+            const turnResult = turnAnalyzer.processFrame(poseResult.keypoints);
+            if (turnResult) {
+              detectedTurns.push(turnResult);
+              console.log(`🏄 Turn detected on frame ${i + 1}:`, {
+                bottomScore: turnResult.bottom_turn.score,
+                topScore: turnResult.top_turn.score,
+                totalScore: turnResult.bottom_turn.score + turnResult.top_turn.score
+              });
+            }
+            
             console.log(`📊 Surf metrics calculated for frame ${i + 1}:`, {
               bodyRotation: metrics.bodyRotation,
               stanceWidth: metrics.stanceWidth,
@@ -191,8 +210,10 @@ const VideoUpload = () => {
       console.log(`🎯 Frame analysis complete: ${frameAnalysisResults.length} frames total`);
       console.log(`📈 Frames with poses: ${frameAnalysisResults.filter(f => f.poses.length > 0).length}`);
       console.log(`⚠️ Frames without poses: ${frameAnalysisResults.filter(f => f.poses.length === 0).length}`);
+      console.log(`🏄 Total turns detected: ${detectedTurns.length}`);
 
       setFrameAnalysis(frameAnalysisResults);
+      setTurnResults(detectedTurns);
       
       setAnalysisStep('Creating analysis session...');
       // Create analysis session in database
@@ -239,6 +260,7 @@ const VideoUpload = () => {
       console.log('📊 Sending frame analysis data:', {
         sessionId: session.id,
         frameCount: frameAnalysisResults.length,
+        turnCount: detectedTurns.length,
         skillLevel
       });
       
@@ -247,6 +269,7 @@ const VideoUpload = () => {
           sessionId: session.id,
           videoPath: uploadData.path,
           frameAnalysis: frameAnalysisResults,
+          turnResults: detectedTurns,
           skillLevel
         }
       });
@@ -486,7 +509,70 @@ const VideoUpload = () => {
         {/* Show extracted frames if analysis is complete */}
         {frameAnalysis.length > 0 && (
           <div className="mt-8">
-            <PoseVisualization frames={frameAnalysis} videoUrl={videoUrl} />
+            <div className="space-y-6">
+              <PoseVisualization frames={frameAnalysis} videoUrl={videoUrl} />
+              
+              {/* Turn Analysis Results */}
+              {turnResults.length > 0 && (
+                <Card className="shadow-wave">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      🏄 Turn Analysis Results ({turnResults.length} turns detected)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {turnResults.map((turn, index) => (
+                        <Card key={index} className="border-2">
+                          <CardContent className="p-4">
+                            <h4 className="font-medium mb-3">Turn {index + 1}</h4>
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                                <span className="text-sm font-medium">Bottom Turn:</span>
+                                <span className="font-bold text-blue-600">
+                                  {turn.bottom_turn.score}/10
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                                <span className="text-sm font-medium">Top Turn:</span>
+                                <span className="font-bold text-green-600">
+                                  {turn.top_turn.score}/10
+                                </span>
+                              </div>
+                              <div className="pt-2 border-t border-gray-200">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-semibold">Total Score:</span>
+                                  <span className="text-lg font-bold text-primary">
+                                    {turn.bottom_turn.score + turn.top_turn.score}/20
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* Turn Details */}
+                              <div className="text-xs text-muted-foreground space-y-1">
+                                <div>Compression: {turn.bottom_turn.snapshot.knee.toFixed(1)}°</div>
+                                <div>Torso Lean: {turn.bottom_turn.snapshot.torso.toFixed(1)}°</div>
+                                <div>Rotation: {turn.bottom_turn.snapshot.rot.toFixed(1)}°</div>
+                                <div>State: {turnAnalyzer.getCurrentState()}</div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    
+                    {turnResults.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No complete turns detected in this video.</p>
+                        <p className="text-sm mt-2">
+                          Current state: {turnAnalyzer.getCurrentState()}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         )}
       </div>
